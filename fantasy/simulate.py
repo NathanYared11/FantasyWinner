@@ -171,6 +171,12 @@ class Sim:
             out += np.where(miss > i, draw, 0).astype(np.float32)
         return out
 
+    def baseline_scores(self):
+        if getattr(self, "_base", None) is None:
+            rost = {t["id"]: t["roster"] for t in self.snap["teams"]}
+            self._base = {w: np.stack([self.team_week(t, rost[t], w) for t in self.team_ids], 1) for w in self.weeks}
+        return self._base
+
     def calibrate(self):
         """Pull the league scoring level halfway toward what teams actually scored (3 weeks is noisy,
         so a full correction would overfit). Relative team strength is untouched."""
@@ -181,6 +187,7 @@ class Sim:
         res = self.run()
         simmed = sum(o["avg_weekly"] for o in res.values()) / len(res)
         self.cal = 1 + .5 * (actual / simmed - 1)
+        self._base = None
         self.calibration = {"actual_mean": round(actual, 1), "sim_mean_before": round(simmed, 1), "scale": round(self.cal, 3)}
         return self.cal
 
@@ -188,12 +195,15 @@ class Sim:
     def run(self, rosters=None):
         """rosters: optional {team_id: [player dicts]} overriding the current rosters."""
         S, T = self.S, len(self.team_ids)
-        rosters = {t["id"]: t["roster"] for t in self.snap["teams"]} | (rosters or {})
+        base = self.baseline_scores()
+        overrides = rosters or {}
+        rosters = {t["id"]: t["roster"] for t in self.snap["teams"]} | overrides
         wins = np.tile(np.array([t["wins"] + .5 * t["ties"] for t in self.snap["teams"]], dtype=np.float32), (S, 1))
         pf = np.tile(np.array([self.base_pf[t] for t in self.team_ids], dtype=np.float32), (S, 1))
-        scores = {}
-        for w in self.weeks:
-            scores[w] = np.stack([self.team_week(t, rosters[t], w) for t in self.team_ids], 1)
+        scores = {w: base[w].copy() for w in self.weeks}     # untouched teams reuse cached draws (common random numbers)
+        for t in overrides:
+            for w in self.weeks:
+                scores[w][:, self.tidx[t]] = self.team_week(t, rosters[t], w)
         for w in self.weeks:
             if w <= self.reg_end:
                 pf += scores[w]

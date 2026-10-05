@@ -41,6 +41,8 @@ def player_row(entry):
         "injury": p.get("injuryStatus", "ACTIVE"),
         "pct_owned": round(p.get("ownership", {}).get("percentOwned", 0), 1),
         "season_pts": round(pool.get("appliedStatTotal", 0), 2),
+        "rank_ppr": p.get("draftRanksByRankType", {}).get("PPR", {}).get("rank"),
+        "auction": p.get("draftRanksByRankType", {}).get("PPR", {}).get("auctionValue"),
         "slot": C.LINEUP_SLOTS.get(entry.get("lineupSlotId"), None),
         "acquired": entry.get("acquisitionType"),
     }
@@ -126,10 +128,12 @@ def ingest(name):
 
     games = []
     for m in sched["schedule"]:
+        # ESPN keeps in-progress scores in totalPointsLive; totalPoints stays 0 until the week is final.
+        pts = lambda side: side.get("totalPoints") or side.get("totalPointsLive") or 0
         g = {"week": m["matchupPeriodId"], "playoff": m.get("playoffTierType") not in (None, "NONE"),
-             "home": m["home"]["teamId"], "home_pts": m["home"].get("totalPoints")}
+             "home": m["home"]["teamId"], "home_pts": pts(m["home"]), "home_win_prob": m["home"].get("winProbability")}
         if "away" in m:
-            g.update(away=m["away"]["teamId"], away_pts=m["away"].get("totalPoints"))
+            g.update(away=m["away"]["teamId"], away_pts=pts(m["away"]))
         games.append(g)
 
     transactions = [{"type": x.get("type"), "status": x.get("status"), "team": x.get("teamId"),
