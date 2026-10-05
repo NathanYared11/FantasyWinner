@@ -1,7 +1,7 @@
 // Project the next unplayed week. Usage: node scripts/predict.js [season] [week] [topN=15]
 import { readFileSync } from "node:fs";
 import { loadStats, loadGames, loadInjuries, POSITIONS } from "../src/data/nflverse.js";
-import { buildDefenseIndex, featureVector, groupByPlayer } from "../src/model/features.js";
+import { buildDefenseIndex, featureVector, groupByPlayer, gameFor } from "../src/model/features.js";
 import { predictRidge } from "../src/model/ridge.js";
 
 const stats = loadStats(), games = loadGames(), injuries = loadInjuries();
@@ -18,10 +18,11 @@ export function projectWeek({ stats, games, injuries, models, season, week, def 
   for (const hist of groupByPlayer(stats.filter((r) => r.idx < idx)).values()) {
     const lastGame = hist.at(-1);
     const game = games.get(`${season}|${week}|${lastGame.team}`);
+    const env = gameFor({ ...lastGame, season, week }, games);
     if (!game || idx - lastGame.idx > 4) continue; // no game scheduled, or not recently active
     const injury = injuries.get(`${season}|${week}|${lastGame.id}`) ?? 0;
     if (injury === 3) continue; // ruled Out
-    const x = featureVector(hist, { idx, opp: game.opp, pos: lastGame.pos, game, injury, def });
+    const x = featureVector(hist, { idx, opp: game.opp, pos: lastGame.pos, game: env, injury, def });
     const m = models.positions[lastGame.pos];
     if (!x || !m) continue;
     const mean = Math.max(0, predictRidge(m, x));

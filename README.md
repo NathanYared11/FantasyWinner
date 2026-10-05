@@ -47,3 +47,18 @@ Caveats: evaluation rows only include players who actually played, so it does no
 Weekly NFL scoring is very noisy, so expect a few percent of error reduction, not a crystal ball. Sleeper and
 ESPN projections are not in the backtest (no historical copies are available); once you log them weekly,
 `src/model/backtest.js` can fit blend weights between them and this model.
+
+## Kickers, defenses, lineups and waivers
+
+- **K and D/ST** are projected by the same model. Their points are derived from nflverse data (FG distance and PATs; sacks, turnovers, TDs, safeties, blocks, and points allowed from the scoreboard) using standard ESPN-style scoring, so a league with custom scoring will differ. The model lowers error versus the baselines for both, but week-to-week ranking skill is low (rank corr about 0.10): treat them as streaming picks.
+- `src/lineup.js`: exact lineup optimizer for any slot layout (FLEX, SUPERFLEX, ...), with `mean`, `floor` (safe) and `ceiling` (need a big week) modes, close-call detection, and waiver-wire gain (points a free agent adds to your best lineup).
+- `src/espn-roster.js`: converts ESPN roster/settings payloads and matches players to projections by name and position.
+
+```sh
+# Live ESPN team (find your team id in the league URL, ?teamId=N)
+ESPN_LEAGUE_ID=123456 ESPN_TEAM_ID=3 ESPN_S2=... ESPN_SWID='{...}' node scripts/lineup.js 5 floor
+# Offline with your own roster file
+node scripts/lineup.js 5 mean --roster roster.json
+```
+
+The live ESPN path (`espn.js` plus the ID mappings in `espn-roster.js`) is untested against ESPN's servers: they are not reachable from the development sandbox. The optimizer, matching and projection code are covered by tests.

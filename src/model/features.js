@@ -73,6 +73,12 @@ export function groupByPlayer(stats) {
 }
 
 // One training/eval row per played game: { pos, season, week, idx, x, y, id, name }.
+// A defense's game environment is the opponent's offense: their implied total, and our (flipped) margin.
+export function gameFor(r, games) {
+  const g = games.get(`${r.season}|${r.week}|${r.team}`);
+  return r.pos === "DST" && g ? { ...g, implied: g.total - g.implied } : g;
+}
+
 export function buildRows(stats, games, injuries) {
   const def = buildDefenseIndex(stats);
   const rows = [];
@@ -80,7 +86,7 @@ export function buildRows(stats, games, injuries) {
     hist.forEach((g, i) => {
       const x = featureVector(hist.slice(0, i), {
         idx: g.idx, opp: g.opp, pos: g.pos, def,
-        game: games.get(`${g.season}|${g.week}|${g.team}`),
+        game: gameFor(g, games),
         injury: injuries.get(`${g.season}|${g.week}|${g.id}`) ?? 0,
       });
       if (x) rows.push({ id: g.id, name: g.name, pos: g.pos, season: g.season, week: g.week, idx: g.idx, x, y: g.ppr });
