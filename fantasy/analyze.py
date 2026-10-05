@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from . import config as C
+from .nfl import NFL
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 
@@ -76,15 +77,29 @@ def ppg_at(lineup, pos, i):
     return lineup[pos][i]["ppg"] if i < len(lineup[pos]) else 0.0
 
 
-def analyze(name):
+def prepare(name, nfl=None):
+    """Load a snapshot and attach blended projections + nflverse usage/bye context to every player."""
     snap = json.loads((DATA / name / "snapshot.json").read_text())
+    week = snap["settings"]["current_week"]
+    nfl = nfl or NFL()
+    snap["nfl_refreshed_at"] = nfl.refreshed_at
+    for p in [p for t in snap["teams"] for p in t["roster"]] + snap["free_agents"]:
+        p.update(project(p, week))
+        p["usage"], mult = nfl.usage(p["id"], p["pos"])
+        for k in ("ppg", "floor", "ceil", "raw_ppg", "sd"):    # role trend is a bounded +/-8% nudge
+            p[k] *= mult
+        p["role_mult"] = round(mult, 3)
+        p["bye"] = nfl.bye_week(p["nfl_team"])
+    snap["_nfl"] = nfl
+    return snap
+
+
+def analyze(name):
+    snap = prepare(name)
     S, week = snap["settings"], snap["settings"]["current_week"]
     slots, nteams = S["lineup_slots"], S["num_teams"]
     teams = {t["id"]: t for t in snap["teams"]}
     me = snap["my_team_id"]
-
-    for p in [p for t in snap["teams"] for p in t["roster"]] + snap["free_agents"]:
-        p.update(project(p, week))
     healthy_fa = [p for p in snap["free_agents"] if p["injury"] in ("ACTIVE", "NORMAL", "QUESTIONABLE", "DAY_TO_DAY")]
     repl = {}
     for pos in ("QB", "RB", "WR", "TE"):
@@ -194,7 +209,7 @@ def analyze(name):
                          "waiver_gain": round(max(0, fa["ppg"] - d[me]), 1) if fa else 0})
     my_needs.sort(key=lambda n: -n["gain_to_top_quartile"])
 
-    out = {"league": S["name"], "refreshed_at": snap["refreshed_at"], "week": week, "my_team_id": me, "teams": {}}
+    out = {"league": S["name"], "refreshed_at": snap["refreshed_at"], "nfl_refreshed_at": snap["nfl_refreshed_at"], "week": week, "my_team_id": me, "teams": {}}
     for tid, t in teams.items():
         strengths = [f"{s} (#{slot_rank[s][tid]})" for s in slot_vals if slot_rank[s][tid] <= 3]
         weaknesses = [f"{s} (#{slot_rank[s][tid]})" for s in slot_vals if slot_rank[s][tid] >= nteams - 3]
@@ -224,7 +239,7 @@ def analyze(name):
 def report(a):
     me = str(a["my_team_id"])
     teams = {str(k): v for k, v in a["teams"].items()}
-    L = [f'# {a["league"]} — week {a["week"]}  (data refreshed {a["refreshed_at"]})', "",
+    L = [f'# {a["league"]} — week {a["week"]}  (ESPN refreshed {a["refreshed_at"]}, nflverse {a["nfl_refreshed_at"]})', "",
          "## Power rankings", "", "| # | Team | Rec | Standing | xWins | Roster | Power | Verdict |", "|--|--|--|--|--|--|--|--|"]
     for t in sorted(teams.items(), key=lambda kv: kv[1]["power_rank"]):
         v = t[1]

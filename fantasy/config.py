@@ -1,7 +1,9 @@
 """League registry. League IDs and ESPN credentials come from environment variables."""
 import os
+from pathlib import Path
 
 SEASON = 2026
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 # name -> (env var holding the ESPN league ID, my ESPN team ID)
 LEAGUES = {
