@@ -4,6 +4,7 @@
   "description": "Tool to win fantasy",
   "type": "module",
   "main": "src/espn.js",
+  "license": "MIT",
   "scripts": {
     "espn": "node src/cli.js",
     "test": "node --test"
