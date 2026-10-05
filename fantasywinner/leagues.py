@@ -37,6 +37,15 @@ class League:
     ir: int = 1
     notes: str = ""
 
+    @property
+    def byes(self) -> int:
+        """First-round byes in an 8-slot bracket (7 teams -> 1 bye, 6 -> 2)."""
+        return max(0, 8 - self.playoff_teams)
+
+    @property
+    def max_per_pos(self) -> dict:
+        return {"QB": 4, "RB": 8, "WR": 8, "TE": 3, "DST": 3, "K": 3}
+
 
 LEAGUES = {
     "legoat": League(

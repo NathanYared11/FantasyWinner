@@ -18,6 +18,7 @@ class Player:
     opp: str = ""
     sd: Optional[float] = None  # weekly std dev of points
     slot: str = ""  # current ESPN slot (QB, RB, FLEX, BE, IR ...)
+    trend: float = 0.0  # recent % change in ownership (waiver buzz)
 
     @property
     def stdev(self) -> float:

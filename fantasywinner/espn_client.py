@@ -45,3 +45,31 @@ def this_week_opponent(league, team_id: int) -> list[Player]:
 
 def free_agents(league, size: int = 50) -> list[Player]:
     return [_to_player(p) for p in league.free_agents(size=size)]
+
+
+def all_rosters(league, my_team_id: int) -> dict:
+    """Every other team's roster, keyed by team name."""
+    return {t.team_name: [_to_player(p) for p in t.roster] for t in league.teams if t.team_id != my_team_id}
+
+
+def my_team_name(league, team_id: int) -> str:
+    return next(t.team_name for t in league.teams if t.team_id == team_id)
+
+
+def season_snapshot(league, regular_weeks: int):
+    """(teams, remaining_schedule) for the playoff simulator."""
+    import statistics
+    teams, weeks = {}, {}
+    for t in league.teams:
+        scores = [s for s in (getattr(t, "scores", []) or []) if s]
+        played = len(scores)
+        teams[t.team_name] = {
+            "wins": t.wins, "pf": float(t.points_for),
+            "mean": statistics.mean(scores) if scores else 100.0,
+            "sd": statistics.pstdev(scores) if len(scores) > 2 else 22.0,
+        }
+        for w, opp in enumerate(t.schedule[:regular_weeks]):
+            if w >= played:
+                a, b = sorted((t.team_name, opp.team_name))
+                weeks.setdefault(w, set()).add((a, b))
+    return teams, [sorted(weeks[w]) for w in sorted(weeks)]

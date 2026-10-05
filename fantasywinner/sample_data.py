@@ -31,3 +31,61 @@ def sample_roster() -> list[Player]:
 
 def sample_opponent() -> list[Player]:
     return [Player(n, pos, "OPP", pr, slot=sl) for n, pos, pr, sl in _OPP]
+
+
+# ---- fictional league for demo mode ----------------------------------------
+import numpy as np
+
+from .season import round_robin
+
+_COUNTS = {"QB": 2, "RB": 5, "WR": 5, "TE": 2, "K": 1, "DST": 1}
+_RANGE = {"QB": (13, 23), "RB": (5, 18), "WR": (5, 17), "TE": (3.5, 12), "K": (6, 9), "DST": (5, 9)}
+_STARTERS = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1, "DST": 1}
+
+
+def sample_league(n_teams: int = 12, seed: int = 3) -> dict:
+    """Team name -> roster. Team 'You' is the sample_roster() above."""
+    rng = np.random.default_rng(seed)
+    league = {"You": sample_roster()}
+    for t in range(2, n_teams + 1):
+        roster = []
+        need = {pos: float(rng.uniform(0.65, 1.3)) for pos in _COUNTS}  # each team is strong/weak at different spots
+        for pos, n in _COUNTS.items():
+            lo, hi = _RANGE[pos]
+            for i in range(n):
+                proj = float(rng.uniform(lo, hi)) * need[pos] * (1.0 if i < _STARTERS.get(pos, 1) + 1 else 0.7)
+                roster.append(Player(f"T{t} {pos}{i + 1}", pos, "DEM", round(proj, 1)))
+        league[f"Team {t}"] = roster
+    return league
+
+
+def sample_free_agents(seed: int = 5) -> list[Player]:
+    rng = np.random.default_rng(seed)
+    fa = []
+    for pos, n in (("QB", 3), ("RB", 8), ("WR", 8), ("TE", 4), ("K", 3), ("DST", 3)):
+        lo, hi = _RANGE[pos]
+        for i in range(n):
+            fa.append(Player(f"FA {pos}{i + 1}", pos, "FAG", round(float(rng.uniform(lo * 0.5, hi * 0.8)), 1),
+                             trend=round(float(rng.uniform(-5, 45)), 1)))
+    return fa
+
+
+def sample_season(current_week: int = 4, regular_weeks: int = 14, seed: int = 9):
+    """Teams (with records so far) and the schedule still to play."""
+    rng = np.random.default_rng(seed)
+    league = sample_league()
+    names = list(league)
+    strength = {t: sum(p.proj for p in __import__("fantasywinner.optimizer", fromlist=["x"]).optimize_lineup(
+        league[t], _STARTERS_FULL)[0]) for t in names}
+    teams = {t: {"wins": 0, "pf": 0.0, "mean": strength[t], "sd": 22.0} for t in names}
+    sched = round_robin(names, regular_weeks)
+    for week in sched[: current_week - 1]:
+        for a, b in week:
+            sa, sb = rng.normal(teams[a]["mean"], 22), rng.normal(teams[b]["mean"], 22)
+            teams[a]["pf"] += sa
+            teams[b]["pf"] += sb
+            teams[a if sa > sb else b]["wins"] += 1
+    return teams, sched[current_week - 1:]
+
+
+_STARTERS_FULL = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "DST": 1, "K": 1}
