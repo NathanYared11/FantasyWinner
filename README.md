@@ -88,3 +88,5 @@ Every team's roster is valued over the rest of the season (default through week 
 League source, in order: live ESPN (`ESPN_LEAGUE_ID`, `ESPN_TEAM_ID`, plus `ESPN_S2`/`ESPN_SWID` if private), `dashboard/league.json`, or a simulated example league. `league.json` looks like `{ "teams": [{ "id": 1, "name": "Team", "mine": true, "roster": [{"name": "Josh Allen", "pos": "QB"}] }, ...], "slots": {"QB":1,"RB":2,"WR":2,"TE":1,"FLEX":1,"DST":1,"K":1} }`.
 
 Limits: projections assume full PPR; betting lines exist only for the current week, so later weeks use a neutral game environment (opponent defense and byes still count); a player's current injury is applied to this week only, so long-term injuries are not discounted yet; the bench depth credit (10% of a bench player's points) is a rough stand-in for injury insurance.
+
+Several leagues: set `ESPN_LEAGUE=NAME` plus `LEAGUE_NAME=<league id>` and `TEAM_NAME=<team id>` (for example `ESPN_LEAGUE=CUZFF`, `LEAGUE_CUZFF=123`, `TEAM_CUZFF=2`) instead of `ESPN_LEAGUE_ID`/`ESPN_TEAM_ID`. Switch leagues by changing `ESPN_LEAGUE`.

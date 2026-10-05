@@ -71,9 +71,18 @@ export class EspnClient {
   }
 }
 
+// Which league/team to use. Either ESPN_LEAGUE_ID + ESPN_TEAM_ID, or a named league: ESPN_LEAGUE=CUZFF
+// with LEAGUE_CUZFF=<league id> and TEAM_CUZFF=<team id> (so several leagues can live in one environment).
+export function leagueEnv(env = process.env) {
+  const name = env.ESPN_LEAGUE;
+  const leagueId = env.ESPN_LEAGUE_ID ?? (name ? env[`LEAGUE_${name}`] : undefined);
+  const teamId = env.ESPN_TEAM_ID ?? (name ? env[`TEAM_${name}`] : undefined);
+  return { leagueId, teamId };
+}
+
 export function fromEnv(env = process.env, overrides = {}) {
   return new EspnClient({
-    leagueId: env.ESPN_LEAGUE_ID,
+    leagueId: leagueEnv(env).leagueId,
     season: env.ESPN_SEASON ? Number(env.ESPN_SEASON) : undefined,
     sport: env.ESPN_SPORT || "football",
     espnS2: env.ESPN_S2,

@@ -7,7 +7,7 @@ import { buildDefenseIndex } from "../src/model/features.js";
 import { projectWeek } from "./predict.js";
 import { optimizeLineup, waiverTargets, closeCalls, DEFAULT_SLOTS } from "../src/lineup.js";
 import { espnPlayer, slotsFromSettings, attachProjections } from "../src/espn-roster.js";
-import { fromEnv } from "../src/espn.js";
+import { fromEnv, leagueEnv } from "../src/espn.js";
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const rosterFile = process.argv.includes("--roster") ? process.argv[process.argv.indexOf("--roster") + 1] : null;
@@ -28,7 +28,7 @@ if (rosterFile) {
   if (f.slots) slots = f.slots;
 } else {
   const espn = fromEnv(process.env, { season });
-  const teamId = Number(process.env.ESPN_TEAM_ID);
+  const teamId = Number(leagueEnv(process.env).teamId);
   if (!teamId) { console.error("Set ESPN_TEAM_ID (your team's id in the league) or pass --roster file.json"); process.exit(2); }
   const data = await espn.league(["mRoster", "mTeam", "mSettings"]);
   slots = slotsFromSettings(data.settings) ?? DEFAULT_SLOTS;

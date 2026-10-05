@@ -33,3 +33,11 @@ test("scoreboard filters by week", async () => {
   const { fetchImpl } = fake({ schedule: [{ matchupPeriodId: 1 }, { matchupPeriodId: 2 }] });
   assert.equal((await new EspnClient({ leagueId: 1, fetchImpl }).scoreboard(2)).length, 1);
 });
+
+import { leagueEnv } from "./espn.js";
+test("named leagues read LEAGUE_<NAME> and TEAM_<NAME>", () => {
+  const env = { ESPN_LEAGUE: "CUZFF", LEAGUE_CUZFF: "111", TEAM_CUZFF: "2", LEAGUE_LEGOAT: "222", TEAM_LEGOAT: "2" };
+  assert.deepEqual(leagueEnv(env), { leagueId: "111", teamId: "2" });
+  assert.deepEqual(leagueEnv({ ...env, ESPN_LEAGUE: "LEGOAT" }), { leagueId: "222", teamId: "2" });
+  assert.deepEqual(leagueEnv({ ESPN_LEAGUE_ID: "9", ESPN_TEAM_ID: "4" }), { leagueId: "9", teamId: "4" });
+});

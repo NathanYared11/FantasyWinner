@@ -23,15 +23,15 @@ export function projectRos(ctx, lastWeek = Number(process.env.FW_LAST_WEEK) || 1
 
 // Where the league comes from: live ESPN, then dashboard/league.json, then a simulated demo league.
 export async function loadRawLeague(ctx, ros) {
-  const { ESPN_LEAGUE_ID, ESPN_TEAM_ID } = process.env;
-  if (ESPN_LEAGUE_ID) {
-    const { fromEnv } = await import("../src/espn.js");
+  const { fromEnv, leagueEnv } = await import("../src/espn.js");
+  const { leagueId, teamId } = leagueEnv(process.env);
+  if (leagueId) {
     const { espnPlayer, slotsFromSettings } = await import("../src/espn-roster.js");
     const data = await fromEnv(process.env, { season: ctx.season }).league(["mRoster", "mTeam", "mSettings"]);
     return {
       source: "ESPN", example: false, slots: slotsFromSettings(data.settings) ?? DEFAULT_SLOTS,
       teams: data.teams.map((t) => ({
-        id: t.id, name: t.name ?? `${t.location} ${t.nickname}`, mine: t.id === Number(ESPN_TEAM_ID),
+        id: t.id, name: t.name ?? `${t.location} ${t.nickname}`, mine: t.id === Number(teamId),
         roster: t.roster.entries.map(espnPlayer).filter(Boolean).map((p) => ({ name: p.name, pos: p.pos })),
       })),
     };
