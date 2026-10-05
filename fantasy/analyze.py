@@ -14,45 +14,45 @@ import sys
 from pathlib import Path
 
 from . import config as C
+from . import model as M
 from .nfl import NFL
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 
-# Assumptions (all tunable) ---------------------------------------------------------------------
-K_PRIOR = 4                      # weeks of evidence worth the preseason prior
-RECENCY = 0.7                    # per-week decay for recent form
-CV = {"QB": .35, "RB": .50, "WR": .55, "TE": .60, "K": .40, "D/ST": .60}   # weekly sd / mean prior
-DEFAULT_PPG = {"QB": 12, "RB": 6, "WR": 6, "TE": 5, "K": 7, "D/ST": 6}
-# Rest-of-season availability by injury designation (fraction of expected output retained).
-HEALTH = {"ACTIVE": 1.0, "NORMAL": 1.0, "QUESTIONABLE": .95, "DAY_TO_DAY": .93, "DOUBTFUL": .75,
-          "OUT": .6, "SUSPENSION": .6, "INJURY_RESERVE": .5}
+DEFAULT_PPG = M.DEFAULT_PPG
 WEIGHTS = {"QB": .13, "RB": .22, "WR": .22, "TE": .10, "FLEX": .09, "Bench": .07,
            "Depth": .06, "Upside": .06, "Health": .05}
 FLEX_POS = ("RB", "WR", "TE")
 
 
-def project(p, week):
-    """Blend recent form, season-to-date and the preseason prior into expected/floor/ceiling ppg."""
+ESPN_PRIOR_W = .85     # ESPN preseason projection vs last year's ppg (ESPN won clearly on 2026 wk 1-3: RMSE 6.93 vs 7.85)
+PARAMS = M.load_params()
+
+
+def availability_factor(status):
+    """Expected share of rest-of-season games played vs a healthy player (from backtested tables)."""
+    ks = range(0, 10)
+    return sum(M.p_play(PARAMS, status, k) for k in ks) / sum(M.p_play(PARAMS, "ACTIVE", k) for k in ks)
+
+
+def project(p, week, gsis_snaps=()):
+    """Expected/floor/ceiling PPR points per game played. Uses fantasy.model (validated by fantasy.backtest)."""
     s, pos = p.get("stats", {}), p["pos"]
-    games = sorted((int(w), v) for w, v in s.get("weekly", {}).items() if int(w) <= week and v != 0)
-    vals = [v for _, v in games]
-    n = len(vals)
-    prior_parts = [(s.get("proj_ppg_2026"), .6), (s.get("ppg_2025"), .4)]
-    prior_parts = [(v, w) for v, w in prior_parts if v]
-    prior = sum(v * w for v, w in prior_parts) / sum(w for _, w in prior_parts) if prior_parts else DEFAULT_PPG[pos]
-    if n:
-        wts = [RECENCY ** (n - 1 - i) for i in range(n)]
-        recent = sum(v * w for v, w in zip(vals, wts)) / sum(wts)
-        actual = .6 * recent + .4 * (sum(vals) / n)
-        mean = (n * actual + K_PRIOR * prior) / (n + K_PRIOR)
-    else:
-        mean = prior
-    w_obs = n / (n + K_PRIOR)
-    sd_prior = CV[pos] * mean
-    sd = math.sqrt(w_obs * stats.pstdev(vals) ** 2 + (1 - w_obs) * sd_prior ** 2) if n >= 3 else sd_prior
-    f = HEALTH.get(p.get("injury", "ACTIVE"), .9)
-    return {"sd": sd * f, "ppg": mean * f, "floor": max(0, mean - 1.28 * sd) * f, "ceil": (mean + 1.28 * sd) * f,
-            "conf": round(w_obs, 2), "health": f, "raw_ppg": mean}
+    hist = [v for _, v in sorted((int(w), v) for w, v in s.get("weekly", {}).items() if int(w) <= week and v != 0)]
+    espn, last = s.get("proj_ppg_2026"), s.get("ppg_2025")
+    prior = (ESPN_PRIOR_W * espn + (1 - ESPN_PRIOR_W) * last) if espn and last else (espn or last)
+    B = dict(PARAMS["blend"], lam=1.0)          # ESPN-led prior needs no shrink toward the position default
+    if pos in M.POS:
+        mean = M.predict_ppg(hist, prior, pos, list(gsis_snaps), None, None, B)
+    else:   # K, D/ST: no usage/environment model; same blend of form + prior
+        mean = M.predict_ppg(hist, prior, "RB", [], None, None, dict(B, bias={"RB": 1.0})) if hist or prior else DEFAULT_PPG[pos]
+        mean = mean if prior else DEFAULT_PPG[pos]
+    n = len(hist)
+    q = (PARAMS["ratio_q"] or {}).get(pos if pos in M.POS else "WR")
+    q10, q90 = (q[10], q[90]) if q else (.3, 1.8)
+    f = availability_factor(p.get("injury", "ACTIVE"))
+    return {"sd": mean * (q90 - q10) / 2.56 * f, "ppg": mean * f, "floor": mean * q10 * f, "ceil": mean * q90 * f,
+            "conf": round(n / (n + PARAMS["blend"]["K"]), 2), "health": f, "raw_ppg": mean}
 
 
 def zscore_scores(values):
@@ -84,11 +84,9 @@ def prepare(name, nfl=None):
     nfl = nfl or NFL()
     snap["nfl_refreshed_at"] = nfl.refreshed_at
     for p in [p for t in snap["teams"] for p in t["roster"]] + snap["free_agents"]:
-        p.update(project(p, week))
-        p["usage"], mult = nfl.usage(p["id"], p["pos"])
-        for k in ("ppg", "floor", "ceil", "raw_ppg", "sd"):    # role trend is a bounded +/-8% nudge
-            p[k] *= mult
-        p["role_mult"] = round(mult, 3)
+        g = nfl.gsis.get(str(p["id"]))
+        p.update(project(p, week, [v for _, v in sorted(nfl.snap.get(g["gsis_id"], {}).items())] if g else []))
+        p["usage"], _ = nfl.usage(p["id"], p["pos"])
         p["bye"] = nfl.bye_week(p["nfl_team"])
     snap["_nfl"] = nfl
     return snap
@@ -231,7 +229,7 @@ def analyze(name):
     out.update(my_needs=my_needs, market=market, cutoff={"seed": cut_n, "team": cutoff["name"],
                "record": f'{cutoff["wins"]}-{cutoff["losses"]}', "my_games_back": ((cutoff["wins"] - teams[me]["wins"]) + (teams[me]["losses"] - cutoff["losses"])) / 2},
                best_free_agents={k: [f'{p["name"]} ({p["ppg"]:.1f})' for p in v] for k, v in best_fa.items()},
-               assumptions={"K_PRIOR": K_PRIOR, "RECENCY": RECENCY, "HEALTH": HEALTH, "WEIGHTS": WEIGHTS, "power_weights": pw})
+               assumptions={"model_params": PARAMS["blend"], "espn_prior_weight": ESPN_PRIOR_W, "WEIGHTS": WEIGHTS, "power_weights": pw})
     (DATA / name / "analysis.json").write_text(json.dumps(out, indent=1, default=str))
     return out
 

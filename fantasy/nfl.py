@@ -13,6 +13,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from . import config as C
+from . import model as M
 
 BASE = "https://github.com/nflverse/nflverse-data/releases/download"
 DIR = Path(__file__).resolve().parent.parent / "data" / "nfl"
@@ -101,6 +102,11 @@ class NFL:
             t, c = _num(r["targets"]) or 0, _num(r["carries"]) or 0
             tt, tc = team_t[(r["team"], r["week"])], team_c[(r["team"], r["week"])]
             self.share[r["player_id"]][int(r["week"])] = (t / tt if tt else 0, c / tc if tc else 0)
+        rows = []
+        for r in stat_rows:
+            if r["position"] in M.POS and r["opponent_team"]:
+                rows.append((int(r["week"]), r["opponent_team"], r["position"], _num(r["fantasy_points_ppr"]) or 0))
+        self.matchups = M.Matchups(rows, [(w, t) for (w, t), g in self.games.items() if g["done"]])
         self.report = {}
         for r in _rows("injuries"):
             self.report[r["gsis_id"]] = (int(r["week"]), r["report_status"], r["practice_status"])
@@ -116,26 +122,31 @@ class NFL:
         return self.games.get((week, self.team(espn_abbrev)))
 
     def env_factor(self, pos, espn_abbrev, week):
-        """Game-environment multiplier from Vegas lines + wind; 1.0 when no line is posted yet."""
+        """Game-environment multiplier. QB/RB/WR/TE exponents + wind come from the backtest
+        (fantasy/params.json); K and D/ST use unvalidated assumptions. 1.0 when no line is posted."""
         g = self.game(week, espn_abbrev)
         if not g or g["implied"] is None:
             return 1.0
-        passing = {"QB", "WR", "TE"}
+        B = M.load_params()["blend"]
         f = 1.0
-        if pos in passing:
-            f = (g["implied"] / LEAGUE_AVG_IMPLIED) ** 0.6
-        elif pos == "RB":
-            f = (g["implied"] / LEAGUE_AVG_IMPLIED) ** 0.4
-        elif pos == "K":
-            f = (g["implied"] / LEAGUE_AVG_IMPLIED) ** 0.5
-        elif pos == "D/ST":
-            f = (LEAGUE_AVG_IMPLIED / max(g["opp_implied"], 10)) ** 0.8
         windy = g["roof"] == "outdoors" and (g["wind"] or 0) >= WIND_MPH
-        if windy and pos in passing:
-            f *= .95
-        elif windy and pos == "K":
-            f *= .92
+        if pos in M.POS:
+            f = (g["implied"] / LEAGUE_AVG_IMPLIED) ** B["env"].get(pos, 0)
+            if windy and pos in ("QB", "WR", "TE"):
+                f *= B["wind"]
+        elif pos == "K":
+            f = (g["implied"] / LEAGUE_AVG_IMPLIED) ** .5 * (.92 if windy else 1)
+        elif pos == "D/ST":
+            f = (LEAGUE_AVG_IMPLIED / max(g["opp_implied"], 10)) ** .8
         return max(.8, min(1.2, f))
+
+    def opp_factor(self, pos, espn_abbrev, week):
+        """Opposing defense's points allowed to the position so far this season (backtest-validated exponent)."""
+        g = self.game(week, espn_abbrev)
+        e = M.load_params()["blend"]["opp"].get(pos, 0)
+        if not g or not e or pos not in M.POS:
+            return 1.0
+        return max(.85, min(1.15, self.matchups.rel(18, g["opp"], pos) ** e))
 
     def usage(self, espn_id, pos):
         """Recent-vs-season role. Returns dict and a bounded multiplier (RB/WR/TE only)."""

@@ -21,31 +21,32 @@ from collections import defaultdict
 import numpy as np
 
 from . import config as C
+from . import model as M
 from .analyze import FLEX_POS, prepare
 
 REG_END_PLAYOFF_WEEKS = (15, 16, 17)
 RHO = {"QB": .15, "WR": .15, "TE": .15, "RB": .05, "K": 0.0, "D/ST": 0.0}
-BASE_PLAY = .97
-# P(plays) by injury designation for k = weeks from now; last value repeats.
-PLAY_BY_STATUS = {
-    "ACTIVE": [BASE_PLAY], "NORMAL": [BASE_PLAY],
-    "QUESTIONABLE": [.88, .95], "DAY_TO_DAY": [.88, .95],
-    "DOUBTFUL": [.25, .85],
-    "OUT": [0, .3, .5, .75],
-    "SUSPENSION": [0, 0, .9],
-    "INJURY_RESERVE": [0, 0, 0, 0, .3, .6],
-}
+PARAMS = M.load_params()
+GRID = np.linspace(0, 1, 101)
+CV_LOGN = {"K": .4, "D/ST": .6}      # unvalidated: no K/DST history in the backtest
 
 
-C_DEFAULT = {"QB": 12, "RB": 6, "WR": 6, "TE": 5, "K": 7, "D/ST": 6}
+def phi(z):
+    """Standard normal CDF (Abramowitz-Stegun erf approximation, ~1e-7 accurate; numpy has no erf)."""
+    x = np.abs(z) / math.sqrt(2)
+    t = 1 / (1 + .3275911 * x)
+    y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - .284496736) * t + .254829592) * t * np.exp(-x * x)
+    return .5 * (1 + np.sign(z) * y)
 
 
-CV_FILL = {"QB": .35, "RB": .5, "WR": .55, "TE": .6, "K": .4, "D/ST": .6}
-
-
-def p_play(status, k):
-    seq = PLAY_BY_STATUS.get(status, [.9])
-    return seq[min(k, len(seq) - 1)]
+def outcome(pos, mean, u, z=None):
+    """Score = mean * empirical (actual/projected) ratio at quantile u. K and D/ST fall back to a lognormal."""
+    q = (PARAMS["ratio_q"] or {}).get(pos)
+    if q:
+        return mean * np.interp(u, GRID, q)
+    cv = CV_LOGN.get(pos, .5)
+    s2 = math.log(1 + cv * cv)
+    return mean * np.exp(-s2 / 2 + math.sqrt(s2) * z)
 
 
 class Sim:
@@ -116,14 +117,12 @@ class Sim:
         for c, p in enumerate(plist):
             if p["bye"] == w:
                 continue
-            env = self.nfl.env_factor(p["pos"], p["nfl_team"], w)
+            env = self.nfl.env_factor(p["pos"], p["nfl_team"], w) * self.nfl.opp_factor(p["pos"], p["nfl_team"], w)
             m = max(p["raw_ppg"] * env * self.cal, .5)
-            cv = min(p["sd"] / max(p["raw_ppg"], .5), 1.5)
-            s2 = math.log(1 + cv * cv)
             rho = RHO.get(p["pos"], 0)
             zz = math.sqrt(rho) * self.shock(p["nfl_team"])[:, j] + math.sqrt(1 - rho) * self.z(p["id"])[:, j]
-            X[:, c] = np.exp(math.log(m) - s2 / 2 + math.sqrt(s2) * zz)
-            A[:, c] = self.u(p["id"])[:, j] < p_play(p["injury"], k)
+            X[:, c] = outcome(p["pos"], m, phi(zz), zz)
+            A[:, c] = self.u(p["id"])[:, j] < M.p_play(PARAMS, p["injury"], k)
             means[c] = m
         return X, A, means
 
@@ -166,12 +165,10 @@ class Sim:
         """Replacement-level scores for `miss` (S,) empty slots at position ps."""
         if np.isscalar(miss) and miss <= 0:
             return 0.0
-        cv = CV_FILL.get(ps, .5)
-        s2 = math.log(1 + cv * cv)
-        mu = math.log(self.repl[ps] * self.cal) - s2 / 2
         out = np.zeros(self.S, dtype=np.float32)
         for i in range(int(np.max(miss)) if not np.isscalar(miss) else int(miss)):
-            out += np.where(miss > i, np.exp(mu + math.sqrt(s2) * rng.standard_normal(self.S)), 0).astype(np.float32)
+            draw = outcome(ps, self.repl[ps] * self.cal, rng.random(self.S), rng.standard_normal(self.S))
+            out += np.where(miss > i, draw, 0).astype(np.float32)
         return out
 
     def calibrate(self):
