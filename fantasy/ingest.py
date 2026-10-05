@@ -46,6 +46,36 @@ def player_row(entry):
     }
 
 
+def player_stats(name, ids):
+    """Weekly actuals, ESPN projections and season averages per player. Points are already scored
+    by the league's own rules, so scoring items never need decoding."""
+    out = {}
+    periods = ["002025", "102025", "002026", "102026"] + [f"11{C.SEASON}{w}" for w in range(1, 19)]
+    for i in range(0, len(ids), 120):
+        flt = {"players": {"filterIds": {"value": ids[i:i + 120]},
+                           "filterStatsForTopScoringPeriodIds": {"value": 5, "additionalValue": periods}}}
+        for p in fetch(name, ["kona_playercard"], flt)["players"]:
+            st = {"weekly": {}, "proj_week": {}, "ppg_2026": None, "games_2026": 0,
+                  "proj_ppg_2026": None, "ppg_2025": None}
+            for x in p["player"].get("stats", []):
+                sid, src, split, wk = x["id"], x["statSourceId"], x["statSplitTypeId"], x.get("scoringPeriodId")
+                if split == 1 and x.get("seasonId") != C.SEASON:
+                    continue
+                if src == 0 and split == 1:
+                    st["weekly"][wk] = round(x.get("appliedTotal", 0), 2)
+                elif src == 1 and split == 1:
+                    st["proj_week"][wk] = round(x.get("appliedTotal", 0), 2)
+                elif sid == "002026" and x.get("appliedAverage"):
+                    st["ppg_2026"] = round(x["appliedAverage"], 2)
+                    st["games_2026"] = round(x["appliedTotal"] / x["appliedAverage"])
+                elif sid == "102026":
+                    st["proj_ppg_2026"] = x.get("appliedAverage")
+                elif sid == "002025":
+                    st["ppg_2025"] = x.get("appliedAverage")
+            out[p["id"]] = st
+    return out
+
+
 def build_settings(d):
     s = d["settings"]
     sched = {k: v for k, v in s["scheduleSettings"].items() if k != "matchupPeriods"}
@@ -109,6 +139,11 @@ def ingest(name):
                     for x in tx.get("transactions", []) if x.get("type") != "LINEUP"]
 
     free_agents = [player_row(p) for p in fa["players"]]
+
+    everyone = [p for t in teams for p in t["roster"]] + free_agents
+    stats = player_stats(name, [p["id"] for p in everyone])
+    for p in everyone:
+        p["stats"] = stats.get(p["id"], {})
 
     # Player availability map: every player we know about -> where he lives.
     avail = {}
