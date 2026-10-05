@@ -41,3 +41,10 @@ test("named leagues read LEAGUE_<NAME> and TEAM_<NAME>", () => {
   assert.deepEqual(leagueEnv({ ...env, ESPN_LEAGUE: "LEGOAT" }), { leagueId: "222", teamId: "2" });
   assert.deepEqual(leagueEnv({ ESPN_LEAGUE_ID: "9", ESPN_TEAM_ID: "4" }), { leagueId: "9", teamId: "4" });
 });
+
+import { leagueSpecs } from "./espn.js";
+test("leagueSpecs finds every named league, default first", () => {
+  const env = { ESPN_LEAGUE: "LEGOAT", LEAGUE_CUZFF: "160", TEAM_CUZFF: "2", LEAGUE_LEGOAT: "223", TEAM_LEGOAT: "2", LEAGUE_NOTEAM: "5" };
+  assert.deepEqual(leagueSpecs(env).map((s) => [s.key, s.leagueId, s.teamId]), [["LEGOAT", "223", "2"], ["CUZFF", "160", "2"]]);
+  assert.deepEqual(leagueSpecs({ ESPN_LEAGUE_ID: "9", ESPN_TEAM_ID: "4" }).map((s) => s.leagueId), ["9"]);
+});

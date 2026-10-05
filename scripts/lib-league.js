@@ -5,6 +5,10 @@ import { buildDefenseIndex } from "../src/model/features.js";
 import { projectWeek } from "./predict.js";
 import { rosProjections, buildLeague, sum } from "../src/league.js";
 import { DEFAULT_SLOTS } from "../src/lineup.js";
+import { leagueSpecs } from "../src/espn.js";
+
+// With several leagues configured, scripts use the one named by ESPN_LEAGUE (else the first).
+export const defaultSpec = () => leagueSpecs(process.env)[0];
 
 export function loadModelData() {
   const stats = loadStats(), games = loadGames(), injuries = loadInjuries();
@@ -22,14 +26,15 @@ export function projectRos(ctx, lastWeek = Number(process.env.FW_LAST_WEEK) || 1
 }
 
 // Where the league comes from: live ESPN, then dashboard/league.json, then a simulated demo league.
-export async function loadRawLeague(ctx, ros) {
-  const { fromEnv, leagueEnv } = await import("../src/espn.js");
-  const { leagueId, teamId } = leagueEnv(process.env);
+export async function loadRawLeague(ctx, ros, spec) {
+  const { fromEnv } = await import("../src/espn.js");
+  const { leagueId, teamId } = spec ?? {};
+  if (leagueId && process.env.FW_OFFLINE_DEMO) return { ...demoLeague(ros, [...spec.key].reduce((a, c) => a + c.charCodeAt(0), 0) % 7), name: spec.key };
   if (leagueId) {
     const { espnPlayer, slotsFromSettings } = await import("../src/espn-roster.js");
-    const data = await fromEnv(process.env, { season: ctx.season }).league(["mRoster", "mTeam", "mSettings"]);
+    const data = await fromEnv(process.env, { season: ctx.season, leagueId }).league(["mRoster", "mTeam", "mSettings"]);
     return {
-      source: "ESPN", example: false, slots: slotsFromSettings(data.settings) ?? DEFAULT_SLOTS,
+      source: "ESPN", example: false, name: data.settings?.name, slots: slotsFromSettings(data.settings) ?? DEFAULT_SLOTS,
       teams: data.teams.map((t) => ({
         id: t.id, name: t.name ?? `${t.location} ${t.nickname}`, mine: t.id === Number(teamId),
         roster: t.roster.entries.map(espnPlayer).filter(Boolean).map((p) => ({ name: p.name, pos: p.pos })),
@@ -44,10 +49,10 @@ export async function loadRawLeague(ctx, ros) {
 }
 
 // Snake draft of the best projected players into 10 teams. Clearly an example, not the user's league.
-export function demoLeague(ros) {
+export function demoLeague(ros, variant = 0) {
   const need = { QB: 2, RB: 5, WR: 5, TE: 2, K: 1, DST: 1 };
   const pool = [...ros.values()].filter((p) => sum(p.w) > 0).sort((a, b) => sum(b.w) - sum(a.w));
-  const teams = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, name: `Team ${i + 1}`, mine: i === 3, roster: [], left: { ...need } }));
+  const teams = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, name: `Team ${i + 1}`, mine: i === (3 + variant) % 10, roster: [], left: { ...need } }));
   const taken = new Set();
   for (let round = 0; round < 16; round++) {
     const order = round % 2 ? [...teams].reverse() : teams;
@@ -61,9 +66,10 @@ export function demoLeague(ros) {
   return { source: "demo", example: true, slots: DEFAULT_SLOTS, teams: teams.map(({ left, ...t }) => t) };
 }
 
-export async function getLeague(ctx = loadModelData()) {
+// spec: { key, leagueId, teamId } for a live ESPN league; omit for league.json / the example league.
+export async function getLeague(ctx = loadModelData(), spec) {
   const { ros, weeks } = projectRos(ctx);
-  const raw = await loadRawLeague(ctx, ros);
+  const raw = await loadRawLeague(ctx, ros, spec);
   const league = buildLeague(raw.teams, ros, weeks);
   return { ctx, ros, weeks, raw, league, slots: raw.slots, meId: league.teams.find((t) => t.mine)?.id ?? league.teams[0].id };
 }

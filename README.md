@@ -89,4 +89,4 @@ League source, in order: live ESPN (`ESPN_LEAGUE_ID`, `ESPN_TEAM_ID`, plus `ESPN
 
 Limits: projections assume full PPR; betting lines exist only for the current week, so later weeks use a neutral game environment (opponent defense and byes still count); a player's current injury is applied to this week only, so long-term injuries are not discounted yet; the bench depth credit (10% of a bench player's points) is a rough stand-in for injury insurance.
 
-Several leagues: set `ESPN_LEAGUE=NAME` plus `LEAGUE_NAME=<league id>` and `TEAM_NAME=<team id>` (for example `ESPN_LEAGUE=CUZFF`, `LEAGUE_CUZFF=123`, `TEAM_CUZFF=2`) instead of `ESPN_LEAGUE_ID`/`ESPN_TEAM_ID`. Switch leagues by changing `ESPN_LEAGUE`.
+Several leagues: set `ESPN_LEAGUE=NAME` plus `LEAGUE_NAME=<league id>` and `TEAM_NAME=<team id>` (for example `ESPN_LEAGUE=CUZFF`, `LEAGUE_CUZFF=123`, `TEAM_CUZFF=2`) instead of `ESPN_LEAGUE_ID`/`ESPN_TEAM_ID`. The dashboard builds *every* `LEAGUE_*`/`TEAM_*` pair into one page with a league switcher (the `ESPN_LEAGUE` one opens first and is also what `scripts/league.js` uses). Set `FW_OFFLINE_DEMO=1` to preview the switcher without ESPN access.

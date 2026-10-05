@@ -48,7 +48,7 @@ button { font-family: inherit; }
 .brand { font-size: 26px; margin-right: auto; }
 .brand span { background: var(--mark); color: var(--on-mark); padding: 0 6px; margin-left: 2px; }
 .tabs { display: flex; gap: 2px; }
-.tab { font: 700 13px var(--f-body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink2); background: none; border: 0; padding: 9px 12px; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -13px; }
+.tab { white-space: nowrap; font: 700 13px var(--f-body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink2); background: none; border: 0; padding: 9px 12px; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -13px; }
 .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
 .tab:hover { color: var(--ink); }
 .chip { font: 500 12px var(--f-mono); letter-spacing: 0.04em; color: var(--ink2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; background: var(--surface); }
@@ -194,6 +194,7 @@ summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--data-
       <button class="tab" role="tab" id="t-board" aria-selected="false" aria-controls="p-board">Rankings</button>
       <button class="tab" role="tab" id="t-model" aria-selected="false" aria-controls="p-model">Model</button>
     </nav>
+    <div class="seg" id="leagueSeg" role="group" aria-label="League" hidden></div>
     <span class="chip" id="stamp"></span>
     <button class="iconbtn" id="themeBtn" aria-label="Switch between light and dark theme">Theme</button>
   </div>
@@ -328,7 +329,7 @@ const POS_LABEL = { DST: "D/ST" };
 const SLOT_LABEL = { DST: "D/ST", FLEX: "FLX", SUPERFLEX: "SFLX", WRRB: "W/R" };
 const posName = (p) => POS_LABEL[p] ?? p;
 const spreadText = (p) => (p.spread == null ? "" : Math.abs(p.spread) < 0.75 ? " · pick'em" : p.spread > 0 ? ` · favored by ${Math.round(p.spread * 2) / 2}` : ` · underdog by ${Math.round(-p.spread * 2) / 2}`);
-const hasTeam = !D.team.example;
+let cur, T, hasTeam;
 
 $("#stamp").textContent = `WK ${D.week} · ${D.season}`;
 
@@ -357,19 +358,24 @@ function lookup(name, pos) {
   return hit ? toPlayer(hit) : { name, pos: pos || "WR", mean: 0, low: 0, high: 0, ok: false };
 }
 
-// Team setup
-const PRESETS = {
+// Team setup (re-run when the league changes)
+const BASE_PRESETS = {
   std: ["1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, K, D/ST", { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, DST: 1, K: 1 }],
   sf: ["1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 SUPERFLEX, D/ST", { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, SUPERFLEX: 1, DST: 1 }],
   nok: ["1 QB, 2 RB, 2 WR, 1 TE, 2 FLEX, D/ST", { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 2, DST: 1 }],
 };
-if (D.team.slots) PRESETS.league = ["Your league's lineup (from ESPN)", D.team.slots];
-$("#preset").innerHTML = Object.entries(PRESETS).map(([k, [l]]) => `<option value="${k}">${esc(l)}</option>`).join("");
-$("#preset").value = D.team.slots ? "league" : "std";
-
-const rosterKey = "fw-roster:" + D.team.name;
-const defaultRoster = D.team.roster.map((s) => `${s.n}, ${s.p}`).join("\n");
-$("#roster").value = store.get(rosterKey) ?? defaultRoster;
+let PRESETS, rosterKey, defaultRoster;
+function setupTeam() {
+  PRESETS = { ...BASE_PRESETS };
+  if (T.slots) PRESETS.league = ["Your league's lineup (from ESPN)", T.slots];
+  $("#preset").innerHTML = Object.entries(PRESETS).map(([k, [l]]) => `<option value="${k}">${esc(l)}</option>`).join("");
+  $("#preset").value = T.slots ? "league" : "std";
+  rosterKey = "fw-roster:" + cur.key + ":" + T.name;
+  defaultRoster = T.roster.map((s) => `${s.n}, ${s.p}`).join("\n");
+  $("#roster").value = store.get(rosterKey) ?? defaultRoster;
+  $("#rosterNote").textContent = "";
+  $("#drawer").hidden = true;
+}
 let objective = "mean";
 
 function parseRoster() {
@@ -397,8 +403,8 @@ function renderTeam() {
   const roster = parseRoster();
   const slots = PRESETS[$("#preset").value][1];
   const edited = store.get(rosterKey) != null && store.get(rosterKey) !== defaultRoster;
-  $("#teamName").textContent = hasTeam ? D.team.name : edited ? "Your team" : "Example team";
-  $("#heroEy").textContent = `Week ${D.week} game plan`;
+  $("#teamName").textContent = hasTeam ? T.name : edited ? "Your team" : "Example team";
+  $("#heroEy").textContent = `${D.leagues.length > 1 ? cur.label + " · " : ""}Week ${D.week} game plan`;
   if (!roster.length) {
     $("#total").textContent = "0"; $("#starters").innerHTML = '<p class="empty">Add players with Edit roster.</p>';
     $("#bench").innerHTML = ""; $("#moves").innerHTML = ""; return;
@@ -434,7 +440,7 @@ function renderTeam() {
       <small>${c.starter.mean.toFixed(1)} vs ${c.bench.mean.toFixed(1)} projected. Ceilings are ${c.starter.high.toFixed(0)} and ${c.bench.high.toFixed(0)}, so ${c.bench.high > c.starter.high ? "the bench player has more upside if you need a big week" : "the starter also has the higher ceiling"}.</small></div>`);
   }
   const have = new Set(roster.map((p) => normName(p.name)));
-  const avail = D.team.free ? new Set(D.team.free.map(normName)) : null;
+  const avail = T.free ? new Set(T.free.map(normName)) : null;
   const pool = D.players.filter((p) => !have.has(normName(p.n)) && p.m >= 5 && p.q < 2 && (!avail || avail.has(normName(p.n)))).slice(0, 220).map(toPlayer);
   for (const { player, gain } of waiverTargets(roster, pool, slots, { top: 3, objective })) {
     const after = optimizeLineup([...roster, player], slots, objective);
@@ -506,33 +512,37 @@ $("#chart").innerHTML = '<div class="note" style="margin:0 0 4px">Average miss i
 $("#accTable").innerHTML = `<thead><tr><th>Position</th>${MODELS.map(([, n]) => `<th class="r">${n}</th>`).join("")}</tr></thead><tbody>` +
   D.acc.map((a) => `<tr><td>${posName(a.pos)}</td>${MODELS.map(([k]) => `<td class="r num">${a[k].toFixed(2)}</td>`).join("")}</tr>`).join("") + "</tbody>";
 
-// Trades
-const L = D.league, Lw = L.weeks.length;
-const lteams = L.teams.map((t) => ({ ...t, roster: t.roster.map((p) => ({ name: p.n, pos: p.p, team: p.t, w: p.w })) }));
-const myTeam = lteams.find((t) => t.mine);
+// Trades (re-run when the league changes)
 const GR_CLASS = (g) => g[0];
 const ordinal = (n) => n + ([11, 12, 13].includes(n % 100) ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] ?? "th"));
-$("#wkRange").textContent = `${L.weeks[0]} to ${L.weeks.at(-1)}`;
-if (L.example) {
-  $("#lbanner").hidden = false;
-  $("#lbanner").innerHTML = "<span>This is an example league (a simulated draft), not yours. Your real league unlocks once all teams are loaded.</span>";
-}
-$("#needs").innerHTML = L.needs.map((x, i) => `<div class="need${i === 0 ? " top" : ""}"><div class="row1"><span class="p">${posName(x.pos)}</span><span class="gr ${GR_CLASS(x.grade)}">${x.grade}</span></div>
-  <div class="eyebrow">${i === 0 ? "Biggest need · " : ""}${ordinal(x.rank)} of ${x.of} teams</div>
-  <small>${x.perWeek.toFixed(1)} pts/wk from your ${posName(x.pos)} starters</small>
-  <small>A solid starter adds <strong>+${Math.max(0, x.solidGain).toFixed(1)}</strong>/wk${x.solid ? ` (${esc(x.solid)})` : ""}. A star adds <strong>+${Math.max(0, x.starGain).toFixed(1)}</strong>${x.star ? ` (${esc(x.star)})` : ""}.</small></div>`).join("");
-$("#needsNote").textContent = "Grade is where your starters at that position rank among all teams. The upgrade numbers are how many points per week your lineup gains from adding that kind of player.";
 const f1 = (x) => (x >= 0 ? "+" : "") + x.toFixed(1);
-$("#ideas").innerHTML = L.ideas.map((t) => `<div class="idea"><div class="gr ${GR_CLASS(t.grade)}">${t.grade}</div>
-  <div><strong>Give ${esc(t.give.join(" + "))}</strong> for <strong>${esc(t.get.join(" + "))}</strong></div>
-  <small>${esc(t.partner)} · you ${f1(t.myDelta)}/wk (${f1(t.seasonPoints)} on the season) · them ${f1(t.theirDelta)}/wk${t.dropped.length ? ` · you drop ${esc(t.dropped.join(", "))}` : ""}</small></div>`).join("") ||
-  '<p class="empty">No deal found where both teams improve. Use the grader below.</p>';
-$("#chips").innerHTML = L.chips.map((c) => `<span class="bchip">${esc(c.name)} <span class="tag2">${posName(c.pos)}</span><span class="num">wanted by ${c.wantedBy}</span></span>`).join("") || '<p class="empty">No clear surplus on your roster.</p>';
-const pmax = Math.max(...L.power.map((t) => t.value)), pmin = Math.min(...L.power.map((t) => t.value));
-$("#power").innerHTML = L.power.map((t, i) => `<div class="rank${t.mine ? " me" : ""}"><span class="num">${i + 1}</span><div>${esc(t.name)}<div class="bar2"><i style="width:${30 + ((t.value - pmin) / Math.max(1, pmax - pmin)) * 70}%"></i></div></div><span class="num">${t.value.toFixed(1)}</span></div>`).join("");
+let L, Lw, lteams, myTeam;
+function setupTrades() {
+  L = cur.league; Lw = L.weeks.length;
+  lteams = L.teams.map((t) => ({ ...t, roster: t.roster.map((p) => ({ name: p.n, pos: p.p, team: p.t, w: p.w })) }));
+  myTeam = lteams.find((t) => t.mine);
+  $("#wkRange").textContent = `${L.weeks[0]} to ${L.weeks.at(-1)}`;
+  $("#lbanner").hidden = !L.example;
+  if (L.example) {
+    $("#lbanner").innerHTML = "<span>This is an example league (a simulated draft), not yours. Your real league unlocks once all teams are loaded.</span>";
+  }
+  $("#needs").innerHTML = L.needs.map((x, i) => `<div class="need${i === 0 ? " top" : ""}"><div class="row1"><span class="p">${posName(x.pos)}</span><span class="gr ${GR_CLASS(x.grade)}">${x.grade}</span></div>
+    <div class="eyebrow">${i === 0 ? "Biggest need · " : ""}${ordinal(x.rank)} of ${x.of} teams</div>
+    <small>${x.perWeek.toFixed(1)} pts/wk from your ${posName(x.pos)} starters</small>
+    <small>A solid starter adds <strong>+${Math.max(0, x.solidGain).toFixed(1)}</strong>/wk${x.solid ? ` (${esc(x.solid)})` : ""}. A star adds <strong>+${Math.max(0, x.starGain).toFixed(1)}</strong>${x.star ? ` (${esc(x.star)})` : ""}.</small></div>`).join("");
+  $("#needsNote").textContent = "Grade is where your starters at that position rank among all teams. The upgrade numbers are how many points per week your lineup gains from adding that kind of player.";
+  $("#ideas").innerHTML = L.ideas.map((t) => `<div class="idea"><div class="gr ${GR_CLASS(t.grade)}">${t.grade}</div>
+    <div><strong>Give ${esc(t.give.join(" + "))}</strong> for <strong>${esc(t.get.join(" + "))}</strong></div>
+    <small>${esc(t.partner)} · you ${f1(t.myDelta)}/wk (${f1(t.seasonPoints)} on the season) · them ${f1(t.theirDelta)}/wk${t.dropped.length ? ` · you drop ${esc(t.dropped.join(", "))}` : ""}</small></div>`).join("") ||
+    '<p class="empty">No deal found where both teams improve. Use the grader below.</p>';
+  $("#chips").innerHTML = L.chips.map((c) => `<span class="bchip">${esc(c.name)} <span class="tag2">${posName(c.pos)}</span><span class="num">wanted by ${c.wantedBy}</span></span>`).join("") || '<p class="empty">No clear surplus on your roster.</p>';
+  const pmax = Math.max(...L.power.map((t) => t.value)), pmin = Math.min(...L.power.map((t) => t.value));
+  $("#power").innerHTML = L.power.map((t, i) => `<div class="rank${t.mine ? " me" : ""}"><span class="num">${i + 1}</span><div>${esc(t.name)}<div class="bar2"><i style="width:${30 + ((t.value - pmin) / Math.max(1, pmax - pmin)) * 70}%"></i></div></div><span class="num">${t.value.toFixed(1)}</span></div>`).join("");
+  $("#partner").innerHTML = lteams.filter((t) => !t.mine).map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join("");
+  renderPick();
+}
 
 // Trade grader
-$("#partner").innerHTML = lteams.filter((t) => !t.mine).map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join("");
 const listHtml = (team, kind) => team.roster.slice().sort((a, b) => b.w.reduce((x, y) => x + y, 0) - a.w.reduce((x, y) => x + y, 0)).map((p) =>
   `<label><input type="checkbox" data-k="${kind}" value="${esc(p.name)}"> ${esc(p.name)} <span class="tag2">${posName(p.pos)}</span><span class="num">${(p.w.reduce((x, y) => x + y, 0) / Lw).toFixed(1)}/wk</span></label>`).join("");
 function renderPick() {
@@ -553,9 +563,21 @@ function grade() {
 }
 $("#partner").addEventListener("change", renderPick);
 $("#p-trades").addEventListener("change", (e) => { if (e.target.matches("input[type=checkbox]")) grade(); });
-renderPick();
 
-renderBanner(); renderTeam(); renderRows();
+// League switcher
+function switchLeague(i) {
+  cur = D.leagues[i]; T = cur.team; hasTeam = !T.example;
+  store.set("fw-league", cur.key);
+  document.querySelectorAll("#leagueSeg button").forEach((b, j) => b.setAttribute("aria-pressed", String(j === i)));
+  setupTeam(); setupTrades(); renderBanner(); renderTeam(); renderRows();
+}
+if (D.leagues.length > 1) {
+  $("#leagueSeg").hidden = false;
+  $("#leagueSeg").innerHTML = D.leagues.map((l, j) => `<button data-i="${j}" aria-pressed="false">${esc(l.label)}</button>`).join("");
+  $("#leagueSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) switchLeague(Number(b.dataset.i)); });
+}
+const savedLeague = Math.max(0, D.leagues.findIndex((l) => l.key === store.get("fw-league")));
+switchLeague(savedLeague);
 const start = location.hash.slice(1);
 showTab(tabs.includes(start) ? start : tabs.includes(store.get("fw-tab")) ? store.get("fw-tab") : "team");
 </script>

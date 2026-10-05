@@ -1,14 +1,14 @@
 // League report: power rankings, what your team needs, trade ideas, and a trade grader.
 //   node scripts/league.js                         full report
 //   node scripts/league.js grade --with 3 --give "Chris Olave" --get "Jahmyr Gibbs,Zay Flowers"
-import { getLeague } from "./lib-league.js";
+import { getLeague, defaultSpec, loadModelData } from "./lib-league.js";
 import { powerRankings, teamNeeds, findTrades, evaluateTrade } from "../src/trade.js";
 import { pkey } from "../src/league.js";
 import { normName } from "../src/espn-roster.js";
 
 const args = process.argv.slice(2);
 const opt = (k) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : undefined);
-const { league, slots, meId, raw, weeks } = await getLeague();
+const { league, slots, meId, raw, weeks } = await getLeague(loadModelData(), defaultSpec());
 const nW = weeks.length, me = league.teams.find((t) => t.id === meId);
 const f1 = (x) => (x >= 0 ? "+" : "") + x.toFixed(1);
 if (raw.example) console.log("** EXAMPLE LEAGUE (simulated draft). Set ESPN_LEAGUE_ID/ESPN_TEAM_ID or add dashboard/league.json for yours. **\n");

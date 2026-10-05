@@ -80,6 +80,15 @@ export function leagueEnv(env = process.env) {
   return { leagueId, teamId };
 }
 
+// Every league configured in the environment: LEAGUE_<NAME> + TEAM_<NAME> pairs, or the single ESPN_LEAGUE_ID.
+export function leagueSpecs(env = process.env) {
+  const specs = Object.keys(env).filter((k) => /^LEAGUE_[A-Za-z0-9_]+$/.test(k) && env[k] && env[`TEAM_${k.slice(7)}`])
+    .map((k) => ({ key: k.slice(7), leagueId: env[k], teamId: env[`TEAM_${k.slice(7)}`] }));
+  if (!specs.length && env.ESPN_LEAGUE_ID) specs.push({ key: "LEAGUE", leagueId: env.ESPN_LEAGUE_ID, teamId: env.ESPN_TEAM_ID });
+  // ESPN_LEAGUE (if set) goes first so it is the default view.
+  return specs.sort((a, b) => (b.key === env.ESPN_LEAGUE) - (a.key === env.ESPN_LEAGUE) || a.key.localeCompare(b.key));
+}
+
 export function fromEnv(env = process.env, overrides = {}) {
   return new EspnClient({
     leagueId: leagueEnv(env).leagueId,
