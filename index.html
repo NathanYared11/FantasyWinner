@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FantasyWinner Live</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --text:#15181e; --muted:#6a7280; --line:#e3e6eb; --accent:#2a6df4; --live:#d93025; --ok:#188038; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1115; --card:#181b21; --text:#e8eaee; --muted:#8b93a1; --line:#2a2f38; --accent:#6c9cff; --live:#ff6b5e; --ok:#5bd17f; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.4 system-ui,sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; padding:16px; max-width:1100px; margin:0 auto; }
+  h1 { font-size:20px; margin:0; }
+  .meta { color:var(--muted); font-size:13px; display:flex; gap:12px; align-items:center; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--ok); display:inline-block; }
+  .dot.err { background:var(--live); }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; max-width:1100px; margin:0 auto; padding:0 16px 12px; }
+  button, select, input { font:inherit; color:var(--text); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:6px 12px; }
+  button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  main { max-width:1100px; margin:0 auto; padding:0 16px 32px; display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .status { font-size:12px; color:var(--muted); display:flex; justify-content:space-between; margin-bottom:8px; }
+  .status.in { color:var(--live); font-weight:600; }
+  .row { display:flex; align-items:center; gap:10px; padding:4px 0; }
+  .row img { width:28px; height:28px; object-fit:contain; }
+  .row .name { flex:1; }
+  .row .rec { color:var(--muted); font-size:12px; }
+  .row .score { font-size:22px; font-variant-numeric:tabular-nums; font-weight:600; }
+  .row.lose .name, .row.lose .score { opacity:.55; }
+  .situation { margin-top:8px; padding-top:8px; border-top:1px solid var(--line); font-size:13px; color:var(--muted); }
+  .empty { grid-column:1/-1; text-align:center; color:var(--muted); padding:40px 0; }
+  .banner { max-width:1100px; margin:0 auto 12px; padding:8px 16px; color:var(--live); font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏈 FantasyWinner Live</h1>
+  <div class="meta"><span><span class="dot" id="dot"></span> <span id="updated">loading…</span></span><span id="week"></span></div>
+</header>
+<div class="controls">
+  <button data-f="all" class="on">All</button>
+  <button data-f="in">Live</button>
+  <button data-f="pre">Upcoming</button>
+  <button data-f="post">Final</button>
+  <input id="q" placeholder="Filter team…" aria-label="Filter team">
+  <select id="rate" aria-label="Refresh interval">
+    <option value="15000">Refresh 15s</option>
+    <option value="30000" selected>Refresh 30s</option>
+    <option value="60000">Refresh 60s</option>
+  </select>
+</div>
+<div class="banner" id="banner" hidden></div>
+<main id="grid"></main>
+
+<script>
+const API = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
+// Shown only when the live feed is unreachable, so the layout is still previewable.
+const SAMPLE = { week:{number:0}, events:[
+  { id:"s1", status:{type:{state:"in",shortDetail:"Q3 5:12"}}, competitions:[{ situation:{downDistanceText:"2nd & 7 at KC 38"}, competitors:[
+    {homeAway:"home",score:"21",team:{displayName:"Kansas City Chiefs",abbreviation:"KC",logo:""},records:[{summary:"5-1"}]},
+    {homeAway:"away",score:"17",team:{displayName:"Buffalo Bills",abbreviation:"BUF",logo:""},records:[{summary:"4-2"}]}]}]},
+  { id:"s2", status:{type:{state:"pre",shortDetail:"Sun 4:25 PM"}}, competitions:[{ competitors:[
+    {homeAway:"home",score:"0",team:{displayName:"Dallas Cowboys",abbreviation:"DAL",logo:""},records:[{summary:"3-3"}]},
+    {homeAway:"away",score:"0",team:{displayName:"Philadelphia Eagles",abbreviation:"PHI",logo:""},records:[{summary:"5-1"}]}]}]},
+  { id:"s3", status:{type:{state:"post",shortDetail:"Final"}}, competitions:[{ competitors:[
+    {homeAway:"home",score:"24",team:{displayName:"Green Bay Packers",abbreviation:"GB",logo:""},records:[{summary:"4-2"}]},
+    {homeAway:"away",score:"20",team:{displayName:"Chicago Bears",abbreviation:"CHI",logo:""},records:[{summary:"2-4"}]}]}]}
+]};
+
+const $ = id => document.getElementById(id);
+let events = [], filter = "all", timer = null;
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function teamRow(c, other, state) {
+  const lose = state === "post" && Number(c.score) < Number(other.score);
+  const logo = c.team.logo ? `<img src="${esc(c.team.logo)}" alt="" loading="lazy">` : `<img alt="">`;
+  return `<div class="row ${lose ? "lose" : ""}">${logo}
+    <div class="name">${esc(c.team.displayName)} <span class="rec">${esc(c.records?.[0]?.summary || "")}</span></div>
+    <div class="score">${state === "pre" ? "–" : esc(c.score)}</div></div>`;
+}
+
+function render() {
+  const q = $("q").value.trim().toLowerCase();
+  const list = events.filter(e => {
+    const state = e.status.type.state;
+    if (filter !== "all" && state !== filter) return false;
+    if (!q) return true;
+    return e.competitions[0].competitors.some(c =>
+      c.team.displayName.toLowerCase().includes(q) || c.team.abbreviation.toLowerCase() === q);
+  });
+  $("grid").innerHTML = list.length ? list.map(e => {
+    const comp = e.competitions[0], state = e.status.type.state;
+    const away = comp.competitors.find(c => c.homeAway === "away");
+    const home = comp.competitors.find(c => c.homeAway === "home");
+    const sit = comp.situation?.downDistanceText;
+    return `<div class="card">
+      <div class="status ${state}"><span>${state === "in" ? "● LIVE" : ""} ${esc(e.status.type.shortDetail)}</span></div>
+      ${teamRow(away, home, state)}${teamRow(home, away, state)}
+      ${sit && state === "in" ? `<div class="situation">${esc(sit)}</div>` : ""}</div>`;
+  }).join("") : `<div class="empty">No games match.</div>`;
+}
+
+async function load() {
+  const banner = $("banner");
+  try {
+    const res = await fetch(API, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    events = data.events || [];
+    $("week").textContent = data.week?.number ? "Week " + data.week.number : "";
+    $("dot").className = "dot";
+    banner.hidden = true;
+  } catch (err) {
+    events = SAMPLE.events;
+    $("week").textContent = "";
+    $("dot").className = "dot err";
+    banner.hidden = false;
+    banner.textContent = "Live feed unavailable (" + err.message + ") — showing sample data. Retrying automatically.";
+  }
+  $("updated").textContent = "updated " + new Date().toLocaleTimeString();
+  render();
+}
+
+function schedule() {
+  clearInterval(timer);
+  timer = setInterval(() => { if (!document.hidden) load(); }, Number($("rate").value));
+}
+
+document.querySelectorAll("[data-f]").forEach(b => b.onclick = () => {
+  filter = b.dataset.f;
+  document.querySelectorAll("[data-f]").forEach(x => x.classList.toggle("on", x === b));
+  render();
+});
+$("q").oninput = render;
+$("rate").onchange = schedule;
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+
+load(); schedule();
+</script>
+</body>
+</html>
