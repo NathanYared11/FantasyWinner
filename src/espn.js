@@ -1,0 +1,101 @@
+// Minimal client for ESPN's (unofficial) Fantasy API.
+// Private leagues need the `espn_s2` and `SWID` cookies from a logged-in browser session.
+
+const BASE = "https://lksv3.fantasy.espn.com/apis/v3/games";
+
+export const SPORTS = {
+  football: "ffl",
+  basketball: "fba",
+  baseball: "flb",
+  hockey: "fhl",
+};
+
+// Views accepted by ESPN, e.g. mTeam, mRoster, mMatchup, mSettings, mStandings, kona_player_info.
+export class EspnClient {
+  constructor({ leagueId, season, sport = "football", espnS2, swid, fetchImpl = fetch } = {}) {
+    if (!leagueId) throw new Error("leagueId is required");
+    if (!SPORTS[sport]) throw new Error(`unknown sport "${sport}" (use ${Object.keys(SPORTS).join(", ")})`);
+    this.leagueId = String(leagueId);
+    this.season = season ?? new Date().getFullYear();
+    this.sport = SPORTS[sport];
+    this.espnS2 = espnS2;
+    this.swid = swid;
+    this.fetch = fetchImpl;
+  }
+
+  url(views = [], params = {}) {
+    const u = new URL(`${BASE}/${this.sport}/seasons/${this.season}/segments/0/leagues/${this.leagueId}`);
+    for (const v of views) u.searchParams.append("view", v);
+    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+    return u;
+  }
+
+  async request(views, params, headers = {}) {
+    const cookie = this.espnS2 && this.swid ? `espn_s2=${this.espnS2}; SWID=${this.swid}` : undefined;
+    const res = await this.fetch(this.url(views, params), {
+      headers: { accept: "application/json", ...(cookie && { cookie }), ...headers },
+    });
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`ESPN denied access (${res.status}); private leagues need espn_s2 and SWID cookies`);
+    }
+    if (!res.ok) throw new Error(`ESPN request failed: ${res.status} ${res.statusText}`);
+    return res.json();
+  }
+
+  league(views = ["mTeam", "mRoster", "mSettings", "mStandings"]) {
+    return this.request(views);
+  }
+
+  async teams() {
+    const data = await this.league(["mTeam", "mRoster"]);
+    return data.teams ?? [];
+  }
+
+  async scoreboard(week) {
+    const data = await this.request(["mMatchup", "mMatchupScore"], week ? { scoringPeriodId: week } : {});
+    return week ? (data.schedule ?? []).filter((m) => m.matchupPeriodId === Number(week)) : (data.schedule ?? []);
+  }
+
+  // Top available/rostered players; ESPN filters via the x-fantasy-filter header.
+  async players({ limit = 50, offset = 0, statusIds } = {}) {
+    const filter = {
+      players: {
+        limit,
+        offset,
+        sortPercOwned: { sortPriority: 1, sortAsc: false },
+        ...(statusIds && { filterStatus: { value: statusIds } }),
+      },
+    };
+    const data = await this.request(["kona_player_info"], {}, { "x-fantasy-filter": JSON.stringify(filter) });
+    return data.players ?? [];
+  }
+}
+
+// Which league/team to use. Either ESPN_LEAGUE_ID + ESPN_TEAM_ID, or a named league: ESPN_LEAGUE=CUZFF
+// with LEAGUE_CUZFF=<league id> and TEAM_CUZFF=<team id> (so several leagues can live in one environment).
+export function leagueEnv(env = process.env) {
+  const name = env.ESPN_LEAGUE;
+  const leagueId = env.ESPN_LEAGUE_ID ?? (name ? env[`LEAGUE_${name}`] : undefined);
+  const teamId = env.ESPN_TEAM_ID ?? (name ? env[`TEAM_${name}`] : undefined);
+  return { leagueId, teamId };
+}
+
+// Every league configured in the environment: LEAGUE_<NAME> + TEAM_<NAME> pairs, or the single ESPN_LEAGUE_ID.
+export function leagueSpecs(env = process.env) {
+  const specs = Object.keys(env).filter((k) => /^LEAGUE_[A-Za-z0-9_]+$/.test(k) && env[k] && env[`TEAM_${k.slice(7)}`])
+    .map((k) => ({ key: k.slice(7), leagueId: env[k], teamId: env[`TEAM_${k.slice(7)}`] }));
+  if (!specs.length && env.ESPN_LEAGUE_ID) specs.push({ key: "LEAGUE", leagueId: env.ESPN_LEAGUE_ID, teamId: env.ESPN_TEAM_ID });
+  // ESPN_LEAGUE (if set) goes first so it is the default view.
+  return specs.sort((a, b) => (b.key === env.ESPN_LEAGUE) - (a.key === env.ESPN_LEAGUE) || a.key.localeCompare(b.key));
+}
+
+export function fromEnv(env = process.env, overrides = {}) {
+  return new EspnClient({
+    leagueId: leagueEnv(env).leagueId,
+    season: env.ESPN_SEASON ? Number(env.ESPN_SEASON) : undefined,
+    sport: env.ESPN_SPORT || "football",
+    espnS2: env.ESPN_S2,
+    swid: env.ESPN_SWID,
+    ...overrides,
+  });
+}

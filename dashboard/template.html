@@ -1,0 +1,583 @@
+<title>FantasyWinner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: broadcast-graphics game sheet. Masthead, then one hero number for the week, a depth chart of starters beside a "moves" rail, tiers and model report on their own tabs. The yellow first-down marker is the only accent; data marks stay blue. */
+:root {
+  --bg: #f1f3f8; --surface: #ffffff; --surface2: #e7ebf3; --line: #d5dce8;
+  --ink: #0d1524; --ink2: #44536b; --muted: #66758d;
+  --mark: #f5c518; --on-mark: #1a1400;
+  --data: #2a78d6; --data-soft: #cfe0f7; --data-strong: #1d5fb0;
+  --good: #14804a; --warn: #9a5b00; --crit: #b83a38; --warn-soft: #fbecd0; --crit-soft: #f7dcdb;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --f-display: "Big Shoulders Display", Impact, "Arial Narrow", sans-serif;
+  --f-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1220; --surface: #121c30; --surface2: #1a2740; --line: #25344f;
+    --ink: #eef2f8; --ink2: #aab7cb; --muted: #7d8ca4;
+    --data: #3987e5; --data-soft: #1d3558; --data-strong: #7db2f0;
+    --good: #4cc38a; --warn: #f0a43c; --crit: #f0706e; --warn-soft: #3b2c12; --crit-soft: #40201f;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1220; --surface: #121c30; --surface2: #1a2740; --line: #25344f;
+  --ink: #eef2f8; --ink2: #aab7cb; --muted: #7d8ca4;
+  --data: #3987e5; --data-soft: #1d3558; --data-strong: #7db2f0;
+  --good: #4cc38a; --warn: #f0a43c; --crit: #f0706e; --warn-soft: #3b2c12; --crit-soft: #40201f;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 15px/1.5 var(--f-body); }
+.wrap { max-width: 1120px; margin-inline: auto; padding-inline: 16px; padding-block: 0 64px; }
+h1, h2, h3, p { margin: 0; }
+button { font-family: inherit; }
+.disp { font-family: var(--f-display); font-weight: 800; text-transform: uppercase; letter-spacing: 0.01em; line-height: 0.95; }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid var(--data-strong); outline-offset: 2px; }
+
+/* masthead */
+.mast { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); border-bottom: 3px solid var(--mark); }
+.mast-in { max-width: 1120px; margin-inline: auto; padding: 10px 16px; display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; }
+.brand { font-size: 26px; margin-right: auto; }
+.brand span { background: var(--mark); color: var(--on-mark); padding: 0 6px; margin-left: 2px; }
+.tabs { display: flex; gap: 2px; }
+.tab { white-space: nowrap; font: 700 13px var(--f-body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink2); background: none; border: 0; padding: 9px 12px; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -13px; }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.tab:hover { color: var(--ink); }
+.chip { font: 500 12px var(--f-mono); letter-spacing: 0.04em; color: var(--ink2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; background: var(--surface); }
+.iconbtn { background: var(--surface); border: 1px solid var(--line); color: var(--ink2); border-radius: 999px; padding: 4px 12px; font: 600 12px var(--f-body); cursor: pointer; }
+.mast-row2 { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 640px) { .tabs { width: 100%; overflow-x: auto; } .tab { margin-bottom: 0; } .mast { border-bottom-width: 3px; } }
+
+.panel { padding-top: 24px; }
+.panel[hidden] { display: none; }
+.eyebrow { font: 600 11px var(--f-body); text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 40px; align-items: end; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+@media (max-width: 760px) { .hero { grid-template-columns: minmax(0, 1fr); } }
+.team { font-size: clamp(34px, 6vw, 56px); margin-top: 4px; }
+.big { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
+.big .disp { font-size: clamp(72px, 14vw, 128px); line-height: 0.85; }
+.big .u { font-size: 18px; color: var(--ink2); font-weight: 600; }
+.underline { height: 6px; width: 120px; background: var(--mark); margin-top: 10px; }
+.sub { color: var(--ink2); margin-top: 10px; max-width: 46ch; }
+.rangebox .lbls { display: flex; justify-content: space-between; margin-top: 6px; font: 500 12px var(--f-mono); color: var(--ink2); }
+.rtrack { position: relative; height: 22px; background: var(--surface2); border-radius: 4px; margin-top: 10px; }
+.rband { position: absolute; top: 4px; bottom: 4px; background: var(--data-soft); border: 1px solid var(--data); border-radius: 3px; }
+.rtick { position: absolute; top: -4px; bottom: -4px; width: 4px; margin-left: -2px; background: var(--mark); border-radius: 1px; box-shadow: 0 0 0 2px var(--bg); }
+.banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; background: var(--surface); border: 1px dashed var(--muted); border-radius: 8px; padding: 10px 14px; margin-bottom: 18px; color: var(--ink2); font-size: 14px; }
+.btn { font: 700 13px var(--f-body); border-radius: 6px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.btn.primary { background: var(--mark); color: var(--on-mark); border-color: var(--mark); }
+
+/* two-column body */
+.cols { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 28px; padding-top: 22px; align-items: start; }
+@media (max-width: 900px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.sech { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.sech h2 { font: 800 22px var(--f-display); text-transform: uppercase; letter-spacing: 0.02em; }
+
+/* depth chart */
+.slot { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.slot .tag { font: 800 22px var(--f-display); text-transform: uppercase; color: var(--ink2); grid-row: span 2; }
+.slot .who { font-weight: 700; font-size: 16px; min-width: 0; overflow-wrap: anywhere; }
+.slot .meta { color: var(--muted); font-size: 12.5px; grid-column: 2; min-width: 0; }
+.slot .pts { font: 800 34px var(--f-display); text-align: right; line-height: 1; grid-row: 1; grid-column: 3; }
+.slot .mini { grid-column: 3; grid-row: 2; width: 92px; height: 6px; position: relative; background: var(--surface2); border-radius: 3px; justify-self: end; }
+.slot .mini i { position: absolute; top: 0; bottom: 0; background: var(--data); opacity: 0.55; border-radius: 3px; }
+.slot .mini b { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1px; background: var(--mark); }
+.slot.nm { border-style: dashed; }
+.pill { font: 700 10.5px var(--f-body); letter-spacing: 0.04em; text-transform: uppercase; border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
+.pill.q { background: var(--warn-soft); color: var(--warn); }
+.pill.d { background: var(--crit-soft); color: var(--crit); }
+.pill.me { background: var(--mark); color: var(--on-mark); }
+.bench { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.bchip { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; font-size: 13px; }
+.bchip .num { color: var(--ink2); margin-left: 6px; font-size: 12px; }
+
+/* moves rail */
+.move { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; border-left: 4px solid var(--mark); }
+.move .k { font: 700 10.5px var(--f-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.move .t { margin-top: 3px; }
+.move .g { float: right; font: 800 24px var(--f-display); color: var(--good); }
+.move small { color: var(--ink2); display: block; margin-top: 4px; font-size: 12.5px; }
+.empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+
+/* controls & tables */
+.bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.seg button { font: 600 13px var(--f-body); color: var(--ink2); background: none; border: 0; padding: 8px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--mark); color: var(--on-mark); }
+input[type=search], select, textarea { font: 400 14px var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; }
+input[type=search] { width: min(260px, 100%); }
+textarea { width: 100%; min-height: 220px; font-family: var(--f-mono); font-size: 13px; line-height: 1.6; resize: vertical; }
+label.lbl { display: block; margin-bottom: 6px; }
+.drawer { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 18px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 24px; }
+@media (max-width: 760px) { .drawer { grid-template-columns: minmax(0, 1fr); } }
+.drawer[hidden] { display: none; }
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { text-align: left; font: 700 11px var(--f-body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.r, th.r { text-align: right; }
+tr.mine td { background: color-mix(in srgb, var(--mark) 14%, transparent); }
+tr.tier td { background: var(--surface2); font: 800 14px var(--f-display); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink2); padding-block: 5px; }
+.tag2 { font: 500 11px var(--f-mono); color: var(--ink2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+.range { position: relative; width: 190px; height: 8px; background: var(--surface2); border-radius: 4px; }
+.range i { position: absolute; top: 0; bottom: 0; background: var(--data); opacity: 0.5; border-radius: 4px; }
+.range b { position: absolute; top: -3px; bottom: -3px; width: 3px; margin-left: -1px; background: var(--mark); }
+.more { margin-top: 10px; font: 700 13px var(--f-body); color: var(--data-strong); background: none; border: 0; cursor: pointer; padding: 4px 0; }
+.note { color: var(--muted); font-size: 13px; max-width: 72ch; margin-top: 10px; }
+
+/* trades */
+.rank { display: grid; grid-template-columns: 28px minmax(0, 1fr) 70px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.rank:last-child { border-bottom: 0; }
+.rank .bar2 { height: 8px; background: var(--surface2); border-radius: 4px; margin-top: 4px; position: relative; }
+.rank .bar2 i { position: absolute; inset: 0 auto 0 0; background: var(--data); border-radius: 4px; opacity: 0.6; }
+.rank.me .bar2 i { background: var(--mark); opacity: 1; }
+.rank.me { font-weight: 700; }
+.needs { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.need { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.need.top { border-top: 4px solid var(--mark); }
+.need .row1 { display: flex; justify-content: space-between; align-items: baseline; }
+.need .p { font: 800 28px var(--f-display); text-transform: uppercase; }
+.gr { font: 800 30px var(--f-display); }
+.gr.A, .gr.B { color: var(--good); } .gr.C { color: var(--warn); } .gr.D, .gr.F { color: var(--crit); }
+.need small { display: block; color: var(--ink2); margin-top: 4px; font-size: 12.5px; }
+.idea { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 4px 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.idea .gr { grid-row: span 2; text-align: center; }
+.idea small { color: var(--ink2); font-size: 12.5px; }
+.grader { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.pick { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 24px; margin: 12px 0; }
+@media (max-width: 700px) { .pick { grid-template-columns: minmax(0, 1fr); } }
+.pl { max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+.pl label { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 14px; cursor: pointer; }
+.pl label .num { margin-left: auto; color: var(--ink2); font-size: 12px; }
+.verdict { margin-top: 12px; border-top: 4px solid var(--mark); padding-top: 12px; display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 12px; align-items: center; }
+.verdict .gr { font-size: 64px; line-height: 1; text-align: center; }
+.chips2 { display: flex; flex-wrap: wrap; gap: 8px; }
+/* model */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 16px 0 22px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.stat .disp { font-size: 64px; display: block; }
+.stat .k { color: var(--ink2); font-size: 13px; }
+.stat.hl { border-top: 4px solid var(--mark); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 12px; font-size: 13px; color: var(--ink2); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; }
+.crow { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: center; }
+.crow:last-child { border-bottom: 0; }
+.crow > b { font: 800 22px var(--f-display); text-transform: uppercase; }
+.bars { display: grid; gap: 4px; }
+.brow { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; align-items: center; }
+.btrack { height: 10px; }
+.bfill { height: 100%; border-radius: 0 4px 4px 0; min-width: 2px; }
+.brow .num { font-size: 12px; color: var(--ink2); text-align: right; }
+details { margin-top: 14px; }
+summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--data-strong); }
+</style>
+
+<header class="mast">
+  <div class="mast-in">
+    <div class="brand disp">Fantasy<span>Winner</span></div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab" role="tab" id="t-team" aria-selected="true" aria-controls="p-team">My team</button>
+      <button class="tab" role="tab" id="t-trades" aria-selected="false" aria-controls="p-trades">Trades</button>
+      <button class="tab" role="tab" id="t-board" aria-selected="false" aria-controls="p-board">Rankings</button>
+      <button class="tab" role="tab" id="t-model" aria-selected="false" aria-controls="p-model">Model</button>
+    </nav>
+    <div class="seg" id="leagueSeg" role="group" aria-label="League" hidden></div>
+    <span class="chip" id="stamp"></span>
+    <button class="iconbtn" id="themeBtn" aria-label="Switch between light and dark theme">Theme</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <section class="panel" id="p-team" role="tabpanel" aria-labelledby="t-team">
+    <div class="banner" id="banner" hidden></div>
+    <div class="drawer" id="drawer" hidden>
+      <div>
+        <label class="eyebrow lbl" for="roster">Roster, one player per line (Name, POS)</label>
+        <textarea id="roster" spellcheck="false"></textarea>
+        <p class="note" id="rosterNote"></p>
+      </div>
+      <div>
+        <label class="eyebrow lbl" for="preset">Lineup slots</label>
+        <select id="preset"></select>
+        <div style="margin-top:16px"><span class="eyebrow lbl">Optimize for</span>
+          <div class="seg" id="objSeg" role="group" aria-label="Objective">
+            <button data-o="floor" aria-pressed="false">Safe floor</button>
+            <button data-o="mean" aria-pressed="true">Expected</button>
+            <button data-o="ceiling" aria-pressed="false">Ceiling</button>
+          </div>
+        </div>
+        <p class="note">Floor picks the players least likely to flop. Ceiling picks the highest upside, for when you are an underdog.</p>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div>
+        <div class="eyebrow" id="heroEy"></div>
+        <h1 class="team disp" id="teamName"></h1>
+        <div class="big"><span class="disp" id="total"></span><span class="u">projected points</span></div>
+        <div class="underline"></div>
+      </div>
+      <div class="rangebox">
+        <div class="eyebrow">Where this lineup is likely to land (80%)</div>
+        <div class="rtrack"><div class="rband" id="rband"></div><div class="rtick" id="rtick"></div></div>
+        <div class="lbls"><span id="rlo"></span><span id="rmid"></span><span id="rhi"></span></div>
+        <p class="sub" id="heroSub"></p>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div>
+        <div class="sech"><h2>Starting lineup</h2><button class="btn" id="editBtn">Edit roster</button></div>
+        <div id="starters"></div>
+        <div class="sech" style="margin-top:18px"><h2>Bench</h2></div>
+        <div class="bench" id="bench"></div>
+      </div>
+      <div>
+        <div class="sech"><h2>Moves</h2></div>
+        <div id="moves"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-trades" role="tabpanel" aria-labelledby="t-trades" hidden>
+    <div class="banner" id="lbanner" hidden></div>
+    <div class="eyebrow">Rest of season, weeks <span id="wkRange"></span></div>
+    <h2 class="disp" style="font-size:40px;margin:4px 0 14px">What your team needs</h2>
+    <div class="needs" id="needs"></div>
+    <p class="note" id="needsNote"></p>
+    <div class="cols">
+      <div>
+        <div class="sech"><h2>Trade ideas</h2></div>
+        <div id="ideas"></div>
+        <p class="note">Only deals where the other team also gets better are listed, so someone might say yes. Grades come from how your best lineup changes every remaining week, with byes and matchups included.</p>
+        <div class="sech" style="margin-top:20px"><h2>Trade chips</h2></div>
+        <div class="chips2" id="chips"></div>
+      </div>
+      <div>
+        <div class="sech"><h2>Power rankings</h2></div>
+        <div id="power"></div>
+      </div>
+    </div>
+    <div class="sech" style="margin-top:28px"><h2>Grade a trade</h2></div>
+    <div class="grader">
+      <label class="eyebrow lbl" for="partner">Trade with</label>
+      <select id="partner"></select>
+      <div class="pick">
+        <div><span class="eyebrow lbl">You give</span><div class="pl" id="giveList"></div></div>
+        <div><span class="eyebrow lbl">You get</span><div class="pl" id="getList"></div></div>
+      </div>
+      <div id="verdict"><p class="empty">Check the players on each side to see the grade.</p></div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-board" role="tabpanel" aria-labelledby="t-board" hidden>
+    <div class="bar">
+      <div class="seg" id="posSeg" role="group" aria-label="Position"></div>
+      <input type="search" id="q" placeholder="Search player or team" aria-label="Search players">
+    </div>
+    <div class="scroll"><table>
+      <thead><tr><th>#</th><th>Player</th><th>Matchup</th><th class="r">Proj</th><th>Likely range</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <button class="more" id="more" hidden></button>
+    <p class="note">PPR points. The bar is an ~80% range of outcomes and the yellow tick is the projection. Pick a position to see tiers: players inside a tier are close enough that you should decide on matchup and gut. Highlighted rows are on your team.</p>
+  </section>
+
+  <section class="panel" id="p-model" role="tabpanel" aria-labelledby="t-model" hidden>
+    <div class="eyebrow">Report card</div>
+    <h2 class="disp" style="font-size:40px;margin-top:4px">How accurate is it?</h2>
+    <p class="note" style="margin-top:8px">Every week from 2024 through 2026 week 4 was predicted using only earlier games, for fantasy-relevant players. Lower error is better.</p>
+    <div class="stats">
+      <div class="stat hl"><span class="disp" id="tMae"></span><span class="k">points average miss, this model</span></div>
+      <div class="stat"><span class="disp" id="tBase"></span><span class="k">points average miss, recent form</span></div>
+      <div class="stat"><span class="disp" id="tRank"></span><span class="k">weekly ranking correlation (recent form 0.44)</span></div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="chart" id="chart"></div>
+    <details><summary>Show as table</summary>
+      <div class="scroll" style="margin-top:8px"><table id="accTable"></table></div>
+    </details>
+    <p class="note" style="margin-top:14px">A ridge regression per position. It uses recent scoring, carries, targets and target share, Vegas implied team points, home/away, injury report status, and how many points the opposing defense has been allowing. Kickers and defenses are barely predictable week to week, so treat them as streaming picks. The test only includes players who actually played, so surprise inactives are not priced in.</p>
+  </section>
+</div>
+
+<script>
+const D = __DATA__;
+__LINEUP__
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const normName = (n) => n.toLowerCase().replace(/[.'’`]/g, "").replace(/\b(jr|sr|ii|iii|iv|v)\b/g, "").replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+const POS_LABEL = { DST: "D/ST" };
+const SLOT_LABEL = { DST: "D/ST", FLEX: "FLX", SUPERFLEX: "SFLX", WRRB: "W/R" };
+const posName = (p) => POS_LABEL[p] ?? p;
+const spreadText = (p) => (p.spread == null ? "" : Math.abs(p.spread) < 0.75 ? " · pick'em" : p.spread > 0 ? ` · favored by ${Math.round(p.spread * 2) / 2}` : ` · underdog by ${Math.round(-p.spread * 2) / 2}`);
+let cur, T, hasTeam;
+
+$("#stamp").textContent = `WK ${D.week} · ${D.season}`;
+
+// Tabs
+const tabs = ["team", "trades", "board", "model"];
+function showTab(id) {
+  for (const t of tabs) {
+    $("#t-" + t).setAttribute("aria-selected", String(t === id));
+    $("#p-" + t).hidden = t !== id;
+  }
+  if (location.hash.slice(1) !== id) history.replaceState(null, "", "#" + id);
+  store.set("fw-tab", id);
+}
+for (const t of tabs) $("#t-" + t).addEventListener("click", () => showTab(t));
+$("#themeBtn").addEventListener("click", () => {
+  const r = document.documentElement, dark = getComputedStyle(r).colorScheme.includes("dark");
+  r.setAttribute("data-theme", dark ? "light" : "dark");
+});
+
+// Player lookup
+const byKey = new Map(D.players.map((p) => [normName(p.n) + "|" + p.p, p]));
+const byName = new Map(D.players.map((p) => [normName(p.n), p]));
+const toPlayer = (p) => ({ name: p.n, pos: p.p, team: p.t, opp: p.o, spread: p.s, mean: p.m, low: p.l, high: p.h, inj: p.q, ok: true });
+function lookup(name, pos) {
+  const hit = (pos && byKey.get(normName(name) + "|" + pos)) || byName.get(normName(name));
+  return hit ? toPlayer(hit) : { name, pos: pos || "WR", mean: 0, low: 0, high: 0, ok: false };
+}
+
+// Team setup (re-run when the league changes)
+const BASE_PRESETS = {
+  std: ["1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, K, D/ST", { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, DST: 1, K: 1 }],
+  sf: ["1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 SUPERFLEX, D/ST", { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, SUPERFLEX: 1, DST: 1 }],
+  nok: ["1 QB, 2 RB, 2 WR, 1 TE, 2 FLEX, D/ST", { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 2, DST: 1 }],
+};
+let PRESETS, rosterKey, defaultRoster;
+function setupTeam() {
+  PRESETS = { ...BASE_PRESETS };
+  if (T.slots) PRESETS.league = ["Your league's lineup (from ESPN)", T.slots];
+  $("#preset").innerHTML = Object.entries(PRESETS).map(([k, [l]]) => `<option value="${k}">${esc(l)}</option>`).join("");
+  $("#preset").value = T.slots ? "league" : "std";
+  rosterKey = "fw-roster:" + cur.key + ":" + T.name;
+  defaultRoster = T.roster.map((s) => `${s.n}, ${s.p}`).join("\n");
+  $("#roster").value = store.get(rosterKey) ?? defaultRoster;
+  $("#rosterNote").textContent = "";
+  $("#drawer").hidden = true;
+}
+let objective = "mean";
+
+function parseRoster() {
+  const out = [];
+  for (const line of $("#roster").value.split("\n")) {
+    const t = line.trim(); if (!t) continue;
+    const m = t.match(/^(.+?)(?:[,\s]+(QB|RB|WR|TE|K|DST|DEF|D\/ST))?$/i);
+    const pos = (m[2] ?? "").toUpperCase().replace("D/ST", "DST").replace("DEF", "DST");
+    out.push(lookup(m[1].replace(/[,\s]+$/, ""), pos));
+  }
+  return out;
+}
+
+function renderBanner() {
+  const b = $("#banner");
+  const edited = store.get(rosterKey) != null && store.get(rosterKey) !== defaultRoster;
+  if (!hasTeam && !edited) {
+    b.hidden = false;
+    b.innerHTML = '<span>This is an example roster, not your team.</span><button class="btn primary" id="bannerBtn">Add my roster</button>';
+    $("#bannerBtn").addEventListener("click", () => { $("#drawer").hidden = false; $("#roster").focus(); });
+  } else b.hidden = true;
+}
+
+function renderTeam() {
+  const roster = parseRoster();
+  const slots = PRESETS[$("#preset").value][1];
+  const edited = store.get(rosterKey) != null && store.get(rosterKey) !== defaultRoster;
+  $("#teamName").textContent = hasTeam ? T.name : edited ? "Your team" : "Example team";
+  $("#heroEy").textContent = `${D.leagues.length > 1 ? cur.label + " · " : ""}Week ${D.week} game plan`;
+  if (!roster.length) {
+    $("#total").textContent = "0"; $("#starters").innerHTML = '<p class="empty">Add players with Edit roster.</p>';
+    $("#bench").innerHTML = ""; $("#moves").innerHTML = ""; return;
+  }
+  const res = optimizeLineup(roster, slots, objective);
+  const sd = Math.sqrt(res.starters.reduce((s, { player: p }) => s + ((p.high - p.low) / 2.56) ** 2, 0));
+  const lo = Math.max(0, res.total - 1.28 * sd), hi = res.total + 1.28 * sd;
+  const a = Math.max(0, lo - 12), b = hi + 12, pct = (v) => ((v - a) / (b - a)) * 100;
+  $("#total").textContent = res.total.toFixed(0);
+  $("#rband").style.cssText = `left:${pct(lo)}%;width:${pct(hi) - pct(lo)}%`;
+  $("#rtick").style.left = pct(res.total) + "%";
+  $("#rlo").textContent = `floor ${lo.toFixed(0)}`; $("#rmid").textContent = res.total.toFixed(1); $("#rhi").textContent = `ceiling ${hi.toFixed(0)}`;
+  const unk = roster.filter((p) => !p.ok).length;
+  $("#heroSub").textContent = (objective === "floor" ? "Built for the safest floor. " : objective === "ceiling" ? "Built for upside. " : "Built for the best expected score. ") +
+    (unk ? `${unk} player${unk > 1 ? "s" : ""} not found, so they count as 0. Check the spelling.` : "Most weeks land within the shaded range.");
+
+  const row = (slot, p) => {
+    const inj = p.inj === 1 ? '<span class="pill q">Questionable</span>' : p.inj === 2 ? '<span class="pill d">Doubtful</span>' : "";
+    const meta = p.ok ? `${p.team} vs ${p.opp}${spreadText(p)}` : "No projection found. Check the spelling.";
+    const mx = Math.max(p.high, 1);
+    return `<div class="slot${p.ok ? "" : " nm"}"><div class="tag">${SLOT_LABEL[slot] ?? slot}</div>
+      <div class="who">${esc(p.name)}${inj}</div><div class="pts">${p.mean.toFixed(1)}</div>
+      <div class="meta">${esc(meta)}</div>
+      <div class="mini" title="${p.low.toFixed(0)} to ${p.high.toFixed(0)} points"><i style="left:${(p.low / 40) * 100}%;width:${((p.high - p.low) / 40) * 100}%"></i><b style="left:${(p.mean / 40) * 100}%"></b></div></div>`;
+  };
+  $("#starters").innerHTML = res.starters.map(({ slot, player }) => row(slot, player)).join("");
+  $("#bench").innerHTML = res.bench.map((p) => `<span class="bchip">${esc(p.name)} <span class="tag2">${posName(p.pos)}</span><span class="num">${p.mean.toFixed(1)}</span></span>`).join("") || '<p class="empty">Nobody on the bench.</p>';
+
+  // Moves
+  const moves = [];
+  for (const c of closeCalls(res).slice(0, 3)) {
+    moves.push(`<div class="move"><span class="k">Close call · ${SLOT_LABEL[c.slot] ?? c.slot}</span><div class="t"><strong>${esc(c.starter.name)}</strong> over <strong>${esc(c.bench.name)}</strong></div>
+      <small>${c.starter.mean.toFixed(1)} vs ${c.bench.mean.toFixed(1)} projected. Ceilings are ${c.starter.high.toFixed(0)} and ${c.bench.high.toFixed(0)}, so ${c.bench.high > c.starter.high ? "the bench player has more upside if you need a big week" : "the starter also has the higher ceiling"}.</small></div>`);
+  }
+  const have = new Set(roster.map((p) => normName(p.name)));
+  const avail = T.free ? new Set(T.free.map(normName)) : null;
+  const pool = D.players.filter((p) => !have.has(normName(p.n)) && p.m >= 5 && p.q < 2 && (!avail || avail.has(normName(p.n)))).slice(0, 220).map(toPlayer);
+  for (const { player, gain } of waiverTargets(roster, pool, slots, { top: 3, objective })) {
+    const after = optimizeLineup([...roster, player], slots, objective);
+    const out = res.starters.map((s) => s.player).find((p) => !after.starters.some((s) => s.player === p));
+    moves.push(`<div class="move"><span class="g">+${gain.toFixed(1)}</span><span class="k">Pick up</span><div class="t"><strong>${esc(player.name)}</strong> <span class="tag2">${posName(player.pos)}</span></div>
+      <small>${player.team} vs ${player.opp}, ${player.mean.toFixed(1)} projected${out ? `. Replaces ${esc(out.name)} in your lineup.` : "."}</small></div>`);
+  }
+  $("#moves").innerHTML = moves.join("") + (avail ? "" : '<p class="note">Pickups assume every player not on your roster is available. Check your league\'s free agents before you bid.</p>') ||
+    '<p class="empty">No moves. This is your best lineup and nobody available beats it.</p>';
+}
+
+$("#editBtn").addEventListener("click", () => { $("#drawer").hidden = !$("#drawer").hidden; });
+$("#roster").addEventListener("input", () => {
+  store.set(rosterKey, $("#roster").value);
+  $("#rosterNote").textContent = "Saved in this browser only.";
+  renderBanner(); renderTeam(); renderRows();
+});
+$("#preset").addEventListener("change", renderTeam);
+$("#objSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  objective = b.dataset.o;
+  document.querySelectorAll("#objSeg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  renderTeam();
+});
+
+// Rankings with tiers
+let pos = "ALL", limit = 30;
+const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DST"];
+$("#posSeg").innerHTML = POSITIONS.map((p) => `<button data-p="${p}" aria-pressed="${p === pos}">${p === "ALL" ? "All" : posName(p)}</button>`).join("");
+$("#posSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  pos = b.dataset.p; limit = 30;
+  document.querySelectorAll("#posSeg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  renderRows();
+});
+$("#q").addEventListener("input", () => { limit = 30; renderRows(); });
+$("#more").addEventListener("click", () => { limit += 50; renderRows(); });
+
+function renderRows() {
+  const mine = new Set(parseRoster().map((p) => normName(p.name)));
+  const q = $("#q").value.trim().toLowerCase();
+  const all = D.players.filter((p) => (pos === "ALL" || p.p === pos) && (!q || p.n.toLowerCase().includes(q) || p.t.toLowerCase() === q));
+  const shown = all.slice(0, limit), max = Math.max(20, ...all.map((p) => p.h));
+  let tier = 0, html = "";
+  shown.forEach((p, i) => {
+    const prev = shown[i - 1];
+    if (pos !== "ALL" && !q && (!prev || prev.m - p.m >= Math.max(1.3, prev.m * 0.07))) { tier++; html += `<tr class="tier"><td colspan="5">Tier ${tier}</td></tr>`; }
+    const inj = p.q === 1 ? '<span class="pill q">Q</span>' : p.q === 2 ? '<span class="pill d">D</span>' : "";
+    const me = mine.has(normName(p.n)) ? '<span class="pill me">Mine</span>' : "";
+    html += `<tr class="${me ? "mine" : ""}"><td class="num">${i + 1}</td><td><strong>${esc(p.n)}</strong><span class="tag2">${posName(p.p)}</span>${inj}${me}</td>
+      <td>${p.t} vs ${p.o}</td><td class="r num"><strong>${p.m.toFixed(1)}</strong></td>
+      <td><div class="range" title="${p.l.toFixed(0)} to ${p.h.toFixed(0)} points"><i style="left:${(p.l / max) * 100}%;width:${((p.h - p.l) / max) * 100}%"></i><b style="left:${(p.m / max) * 100}%"></b></div></td></tr>`;
+  });
+  $("#rows").innerHTML = html || `<tr><td colspan="5">No players match.</td></tr>`;
+  $("#more").hidden = all.length <= limit;
+  $("#more").textContent = `Show more (${all.length - limit} left)`;
+}
+
+// Model accuracy (lower is better)
+const MODELS = [["model", "Model", "var(--s1)"], ["recent", "Recent form", "var(--s2)"], ["avg", "16-game average", "var(--s3)"]];
+$("#tMae").textContent = D.overall.mae[0].toFixed(2);
+$("#tBase").textContent = D.overall.mae[1].toFixed(2);
+$("#tRank").textContent = D.overall.rank[0].toFixed(2);
+$("#legend").innerHTML = MODELS.map(([, n, c]) => `<span><i style="background:${c}"></i>${n}</span>`).join("");
+const accMax = Math.max(...D.acc.flatMap((a) => [a.model, a.recent, a.avg]));
+$("#chart").innerHTML = '<div class="note" style="margin:0 0 4px">Average miss in points per player-week, by position</div>' +
+  D.acc.map((a) => `<div class="crow"><b>${posName(a.pos)}</b><div class="bars">${MODELS.map(([k, n, c]) =>
+    `<div class="brow" title="${posName(a.pos)} ${n}: ${a[k].toFixed(2)}"><div class="btrack"><div class="bfill" style="width:${(a[k] / accMax) * 100}%;background:${c}"></div></div><span class="num">${a[k].toFixed(2)}</span></div>`).join("")}</div></div>`).join("");
+$("#accTable").innerHTML = `<thead><tr><th>Position</th>${MODELS.map(([, n]) => `<th class="r">${n}</th>`).join("")}</tr></thead><tbody>` +
+  D.acc.map((a) => `<tr><td>${posName(a.pos)}</td>${MODELS.map(([k]) => `<td class="r num">${a[k].toFixed(2)}</td>`).join("")}</tr>`).join("") + "</tbody>";
+
+// Trades (re-run when the league changes)
+const GR_CLASS = (g) => g[0];
+const ordinal = (n) => n + ([11, 12, 13].includes(n % 100) ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] ?? "th"));
+const f1 = (x) => (x >= 0 ? "+" : "") + x.toFixed(1);
+let L, Lw, lteams, myTeam;
+function setupTrades() {
+  L = cur.league; Lw = L.weeks.length;
+  lteams = L.teams.map((t) => ({ ...t, roster: t.roster.map((p) => ({ name: p.n, pos: p.p, team: p.t, w: p.w })) }));
+  myTeam = lteams.find((t) => t.mine);
+  $("#wkRange").textContent = `${L.weeks[0]} to ${L.weeks.at(-1)}`;
+  $("#lbanner").hidden = !L.example;
+  if (L.example) {
+    $("#lbanner").innerHTML = "<span>This is an example league (a simulated draft), not yours. Your real league unlocks once all teams are loaded.</span>";
+  }
+  $("#needs").innerHTML = L.needs.map((x, i) => `<div class="need${i === 0 ? " top" : ""}"><div class="row1"><span class="p">${posName(x.pos)}</span><span class="gr ${GR_CLASS(x.grade)}">${x.grade}</span></div>
+    <div class="eyebrow">${i === 0 ? "Biggest need · " : ""}${ordinal(x.rank)} of ${x.of} teams</div>
+    <small>${x.perWeek.toFixed(1)} pts/wk from your ${posName(x.pos)} starters</small>
+    <small>A solid starter adds <strong>+${Math.max(0, x.solidGain).toFixed(1)}</strong>/wk${x.solid ? ` (${esc(x.solid)})` : ""}. A star adds <strong>+${Math.max(0, x.starGain).toFixed(1)}</strong>${x.star ? ` (${esc(x.star)})` : ""}.</small></div>`).join("");
+  $("#needsNote").textContent = "Grade is where your starters at that position rank among all teams. The upgrade numbers are how many points per week your lineup gains from adding that kind of player.";
+  $("#ideas").innerHTML = L.ideas.map((t) => `<div class="idea"><div class="gr ${GR_CLASS(t.grade)}">${t.grade}</div>
+    <div><strong>Give ${esc(t.give.join(" + "))}</strong> for <strong>${esc(t.get.join(" + "))}</strong></div>
+    <small>${esc(t.partner)} · you ${f1(t.myDelta)}/wk (${f1(t.seasonPoints)} on the season) · them ${f1(t.theirDelta)}/wk${t.dropped.length ? ` · you drop ${esc(t.dropped.join(", "))}` : ""}</small></div>`).join("") ||
+    '<p class="empty">No deal found where both teams improve. Use the grader below.</p>';
+  $("#chips").innerHTML = L.chips.map((c) => `<span class="bchip">${esc(c.name)} <span class="tag2">${posName(c.pos)}</span><span class="num">wanted by ${c.wantedBy}</span></span>`).join("") || '<p class="empty">No clear surplus on your roster.</p>';
+  const pmax = Math.max(...L.power.map((t) => t.value)), pmin = Math.min(...L.power.map((t) => t.value));
+  $("#power").innerHTML = L.power.map((t, i) => `<div class="rank${t.mine ? " me" : ""}"><span class="num">${i + 1}</span><div>${esc(t.name)}<div class="bar2"><i style="width:${30 + ((t.value - pmin) / Math.max(1, pmax - pmin)) * 70}%"></i></div></div><span class="num">${t.value.toFixed(1)}</span></div>`).join("");
+  $("#partner").innerHTML = lteams.filter((t) => !t.mine).map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join("");
+  renderPick();
+}
+
+// Trade grader
+const listHtml = (team, kind) => team.roster.slice().sort((a, b) => b.w.reduce((x, y) => x + y, 0) - a.w.reduce((x, y) => x + y, 0)).map((p) =>
+  `<label><input type="checkbox" data-k="${kind}" value="${esc(p.name)}"> ${esc(p.name)} <span class="tag2">${posName(p.pos)}</span><span class="num">${(p.w.reduce((x, y) => x + y, 0) / Lw).toFixed(1)}/wk</span></label>`).join("");
+function renderPick() {
+  const partner = lteams.find((t) => String(t.id) === $("#partner").value);
+  $("#giveList").innerHTML = listHtml(myTeam, "give");
+  $("#getList").innerHTML = listHtml(partner, "get");
+  grade();
+}
+function grade() {
+  const partner = lteams.find((t) => String(t.id) === $("#partner").value);
+  const sel = (k, team) => [...document.querySelectorAll(`input[data-k="${k}"]:checked`)].map((i) => team.roster.find((p) => p.name === i.value));
+  const give = sel("give", myTeam), get = sel("get", partner);
+  if (!give.length || !get.length) { $("#verdict").innerHTML = '<p class="empty">Check the players on each side to see the grade.</p>'; return; }
+  const r = evaluateTrade(myTeam, partner, give, get, L.slots, Lw);
+  $("#verdict").innerHTML = `<div class="verdict"><div class="gr ${GR_CLASS(r.grade)}">${r.grade}</div><div>
+    <strong>${esc(r.verdict)}</strong>
+    <div class="note" style="margin-top:4px">You: <strong>${f1(r.myDelta)}</strong> pts/week (${f1(r.seasonPoints)} over the rest of the season). ${esc(partner.name)}: <strong>${f1(r.theirDelta)}</strong> pts/week. ${r.likelyAccepted ? "They should consider it." : "They will probably decline."}${r.dropped.length ? ` You would have to drop ${esc(r.dropped.join(", "))}.` : ""}</div></div></div>`;
+}
+$("#partner").addEventListener("change", renderPick);
+$("#p-trades").addEventListener("change", (e) => { if (e.target.matches("input[type=checkbox]")) grade(); });
+
+// League switcher
+function switchLeague(i) {
+  cur = D.leagues[i]; T = cur.team; hasTeam = !T.example;
+  store.set("fw-league", cur.key);
+  document.querySelectorAll("#leagueSeg button").forEach((b, j) => b.setAttribute("aria-pressed", String(j === i)));
+  setupTeam(); setupTrades(); renderBanner(); renderTeam(); renderRows();
+}
+if (D.leagues.length > 1) {
+  $("#leagueSeg").hidden = false;
+  $("#leagueSeg").innerHTML = D.leagues.map((l, j) => `<button data-i="${j}" aria-pressed="false">${esc(l.label)}</button>`).join("");
+  $("#leagueSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) switchLeague(Number(b.dataset.i)); });
+}
+const savedLeague = Math.max(0, D.leagues.findIndex((l) => l.key === store.get("fw-league")));
+switchLeague(savedLeague);
+const start = location.hash.slice(1);
+showTab(tabs.includes(start) ? start : tabs.includes(store.get("fw-tab")) ? store.get("fw-tab") : "team");
+</script>
