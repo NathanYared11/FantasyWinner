@@ -1,48 +1,52 @@
-// Builds dashboard/dist/index.html: the template + this week's projections + the optimizer code.
-//   node scripts/build-dashboard.js [season] [week]
+// Builds dashboard/dist/index.html: template + this week's projections + league analysis + optimizer code.
+//   node scripts/build-dashboard.js
+// League source, in order: ESPN (ESPN_LEAGUE_ID, ESPN_TEAM_ID, [ESPN_S2, ESPN_SWID]), dashboard/league.json
+// ({ teams: [{ id, name, mine?, roster: [{name,pos}] }], slots? }), else a simulated example league.
+// A single-team dashboard/roster.json ({ team, roster, slots?, free? }) still drives the "My team" tab.
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { loadStats, loadGames, loadInjuries } from "../src/data/nflverse.js";
-import { buildDefenseIndex } from "../src/model/features.js";
+import { getLeague, loadModelData } from "./lib-league.js";
 import { projectWeek } from "./predict.js";
+import { powerRankings, teamNeeds, findTrades } from "../src/trade.js";
+import { sum } from "../src/league.js";
 
-const stats = loadStats(), games = loadGames(), injuries = loadInjuries();
-const models = JSON.parse(readFileSync("models/ridge.json", "utf8"));
-const season = Number(process.argv[2]) || stats.at(-1).season;
-const week = Number(process.argv[3]) || stats.at(-1).week + 1;
-const proj = projectWeek({ stats, games, injuries, models, season, week, def: buildDefenseIndex(stats) }).filter((p) => p.mean >= 0.5);
+const ctx = loadModelData();
+const { season, week } = ctx;
+const proj = projectWeek({ ...ctx }).filter((p) => p.mean >= 0.5);
+const { league, slots, meId, raw, weeks } = await getLeague(ctx);
+const me = league.teams.find((t) => t.id === meId);
 
-// Walk-forward accuracy numbers come from scripts/train.js output (relevant players, 2024+).
 const acc = JSON.parse(readFileSync("dashboard/accuracy.json", "utf8"));
-// Your team: live from ESPN when ESPN_LEAGUE_ID + ESPN_TEAM_ID are set, else dashboard/roster.json
-// ({ "team": "Name", "roster": [{"name","pos"}], "slots": {...optional}, "free": ["names"...] }), else an example.
-async function loadTeam() {
-  if (process.env.ESPN_LEAGUE_ID && process.env.ESPN_TEAM_ID) {
-    const { fromEnv } = await import("../src/espn.js");
-    const { espnPlayer, slotsFromSettings } = await import("../src/espn-roster.js");
-    const espn = fromEnv(process.env, { season });
-    const data = await espn.league(["mRoster", "mTeam", "mSettings"]);
-    const t = data.teams.find((x) => x.id === Number(process.env.ESPN_TEAM_ID));
-    if (!t) throw new Error(`team ${process.env.ESPN_TEAM_ID} not found; ids: ${data.teams.map((x) => x.id)}`);
-    const taken = new Set(data.teams.flatMap((x) => x.roster.entries.map((e) => e.playerId)));
-    const free = (await espn.players({ limit: 200, statusIds: ["FREEAGENT", "WAIVERS"] })).map((e) => espnPlayer(e)).filter((p) => p && !taken.has(p.espnId));
-    return { name: t.name ?? `${t.location} ${t.nickname}`, roster: t.roster.entries.map(espnPlayer).filter(Boolean).map((p) => ({ n: p.name, p: p.pos })), slots: slotsFromSettings(data.settings), free: free.map((p) => p.name), example: false };
-  }
-  if (existsSync("dashboard/roster.json")) {
-    const f = JSON.parse(readFileSync("dashboard/roster.json", "utf8"));
-    return { name: f.team ?? "My team", roster: f.roster.map((p) => ({ n: p.name, p: p.pos })), slots: f.slots, free: f.free, example: false };
-  }
-  return { name: "Example team", roster: sample, slots: undefined, free: undefined, example: true };
+const r1 = (x) => +x.toFixed(1);
+const wp = (p) => ({ n: p.name, p: p.pos, t: p.team, w: p.w.map(r1) });
+
+// "My team" tab: the league's team when real, a roster.json when only that exists, else the example roster.
+let team;
+if (raw.example && existsSync("dashboard/roster.json")) {
+  const f = JSON.parse(readFileSync("dashboard/roster.json", "utf8"));
+  team = { name: f.team ?? "My team", roster: f.roster.map((p) => ({ n: p.name, p: p.pos })), slots: f.slots, free: f.free, example: false };
+} else {
+  team = { name: me.name, roster: me.roster.map((p) => ({ n: p.name, p: p.pos })), slots: raw.example ? undefined : slots, free: league.freeAgents.map((p) => p.name), example: raw.example };
 }
 
-const sample = ["Josh Allen QB", "Bijan Robinson RB", "Jonathan Taylor RB", "Kyren Williams RB", "Puka Nacua WR", "Chris Olave WR", "Zay Flowers WR", "Trey McBride TE", "Brandon Aubrey K", "CIN D/ST DST"]
-  .map((s) => ({ n: s.slice(0, s.lastIndexOf(" ")), p: s.slice(s.lastIndexOf(" ") + 1) }));
-const team = await loadTeam();
+const t0 = Date.now();
+const needs = teamNeeds(league, meId, slots);
+const L = {
+  example: raw.example, source: raw.source, weeks, slots, meId,
+  power: powerRankings(league, slots).map((t) => ({ ...t, value: r1(t.value) })),
+  needs: needs.needs.map((x) => ({ ...x, perWeek: r1(x.perWeek), solidGain: r1(x.solidGain), starGain: r1(x.starGain) })),
+  chips: needs.chips.map((c) => ({ ...c, cost: r1(c.cost) })),
+  ideas: findTrades(league, meId, slots, { top: 8 }).map((t) => ({ ...t, myDelta: r1(t.myDelta), theirDelta: r1(t.theirDelta), seasonPoints: r1(t.seasonPoints), dropped: t.dropped })),
+  teams: league.teams.map((t) => ({ id: t.id, name: t.name, mine: t.mine, roster: t.roster.map(wp) })),
+};
+console.log(`league analysis: ${((Date.now() - t0) / 1000).toFixed(0)}s, ${L.ideas.length} trade ideas`);
+
 const data = {
-  season, week, team, ...acc,
+  season, week, team, league: L, ...acc,
   players: proj.map((p) => ({ n: p.name, p: p.pos, t: p.team, o: p.opp, s: p.spread, m: +p.mean.toFixed(2), l: +p.low.toFixed(1), h: +p.high.toFixed(1), q: p.injury })),
 };
-const lineup = readFileSync("src/lineup.js", "utf8").replace(/^export /gm, "");
-const html = readFileSync("dashboard/template.html", "utf8").replace("__DATA__", () => JSON.stringify(data)).replace("__LINEUP__", () => lineup);
+const inline = (f) => readFileSync(f, "utf8").replace(/^import .*$/gm, "").replace(/^export /gm, "");
+const html = readFileSync("dashboard/template.html", "utf8")
+  .replace("__DATA__", () => JSON.stringify(data)).replace("__LINEUP__", () => inline("src/lineup.js") + "\n" + inline("src/trade.js"));
 mkdirSync("dashboard/dist", { recursive: true });
 writeFileSync("dashboard/dist/index.html", html);
-console.log(`dashboard/dist/index.html: ${data.players.length} players, ${(html.length / 1024).toFixed(0)} KB`);
+console.log(`dashboard/dist/index.html: ${data.players.length} players, ${L.teams.length} teams, ${(html.length / 1024).toFixed(0)} KB`);

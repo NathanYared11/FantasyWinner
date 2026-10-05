@@ -75,3 +75,16 @@ The live ESPN path (`espn.js` plus the ID mappings in `espn-roster.js`) is untes
 1. Live ESPN: `ESPN_LEAGUE_ID=… ESPN_TEAM_ID=… [ESPN_S2=… ESPN_SWID=…] node scripts/build-dashboard.js` (uses your league's lineup slots and real free agents).
 2. `dashboard/roster.json` (git-ignored): `{ "team": "Team name", "roster": [{"name": "Josh Allen", "pos": "QB"}, ...], "slots": {"QB":1,"RB":2,"WR":2,"TE":1,"FLEX":1,"DST":1,"K":1}, "free": ["optional list of available players"] }`.
 3. Otherwise it shows a clearly labelled example roster. You can also paste a roster into the page itself; it is saved in your browser only.
+
+## League analysis: team needs and trades
+
+Every team's roster is valued over the rest of the season (default through week 14; set `FW_LAST_WEEK`). Each remaining week is projected by the model, with byes and opponents from the schedule, then each team's best lineup is re-optimized week by week. That gives:
+
+- **Power rankings**: projected lineup points per week for every team.
+- **What your team needs**: your rank at each position, and how many points per week a solid starter or a star would add to your lineup.
+- **Trade ideas**: 1-for-1 and 2-for-1 deals where *both* teams improve, graded A+ to F by your gain.
+- **Trade grader**: pick players on each side (in the dashboard's Trades tab, or `node scripts/league.js grade --with 3 --give "A,B" --get "C"`). It also compares against FantasyCalc's market trade values when that API is reachable.
+
+League source, in order: live ESPN (`ESPN_LEAGUE_ID`, `ESPN_TEAM_ID`, plus `ESPN_S2`/`ESPN_SWID` if private), `dashboard/league.json`, or a simulated example league. `league.json` looks like `{ "teams": [{ "id": 1, "name": "Team", "mine": true, "roster": [{"name": "Josh Allen", "pos": "QB"}] }, ...], "slots": {"QB":1,"RB":2,"WR":2,"TE":1,"FLEX":1,"DST":1,"K":1} }`.
+
+Limits: projections assume full PPR; betting lines exist only for the current week, so later weeks use a neutral game environment (opponent defense and byes still count); a player's current injury is applied to this week only, so long-term injuries are not discounted yet; the bench depth credit (10% of a bench player's points) is a rough stand-in for injury insurance.

@@ -137,6 +137,33 @@ tr.tier td { background: var(--surface2); font: 800 14px var(--f-display); text-
 .more { margin-top: 10px; font: 700 13px var(--f-body); color: var(--data-strong); background: none; border: 0; cursor: pointer; padding: 4px 0; }
 .note { color: var(--muted); font-size: 13px; max-width: 72ch; margin-top: 10px; }
 
+/* trades */
+.rank { display: grid; grid-template-columns: 28px minmax(0, 1fr) 70px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.rank:last-child { border-bottom: 0; }
+.rank .bar2 { height: 8px; background: var(--surface2); border-radius: 4px; margin-top: 4px; position: relative; }
+.rank .bar2 i { position: absolute; inset: 0 auto 0 0; background: var(--data); border-radius: 4px; opacity: 0.6; }
+.rank.me .bar2 i { background: var(--mark); opacity: 1; }
+.rank.me { font-weight: 700; }
+.needs { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.need { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.need.top { border-top: 4px solid var(--mark); }
+.need .row1 { display: flex; justify-content: space-between; align-items: baseline; }
+.need .p { font: 800 28px var(--f-display); text-transform: uppercase; }
+.gr { font: 800 30px var(--f-display); }
+.gr.A, .gr.B { color: var(--good); } .gr.C { color: var(--warn); } .gr.D, .gr.F { color: var(--crit); }
+.need small { display: block; color: var(--ink2); margin-top: 4px; font-size: 12.5px; }
+.idea { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 4px 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.idea .gr { grid-row: span 2; text-align: center; }
+.idea small { color: var(--ink2); font-size: 12.5px; }
+.grader { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.pick { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 24px; margin: 12px 0; }
+@media (max-width: 700px) { .pick { grid-template-columns: minmax(0, 1fr); } }
+.pl { max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+.pl label { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 14px; cursor: pointer; }
+.pl label .num { margin-left: auto; color: var(--ink2); font-size: 12px; }
+.verdict { margin-top: 12px; border-top: 4px solid var(--mark); padding-top: 12px; display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 12px; align-items: center; }
+.verdict .gr { font-size: 64px; line-height: 1; text-align: center; }
+.chips2 { display: flex; flex-wrap: wrap; gap: 8px; }
 /* model */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 16px 0 22px; }
 .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
@@ -163,6 +190,7 @@ summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--data-
     <div class="brand disp">Fantasy<span>Winner</span></div>
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button class="tab" role="tab" id="t-team" aria-selected="true" aria-controls="p-team">My team</button>
+      <button class="tab" role="tab" id="t-trades" aria-selected="false" aria-controls="p-trades">Trades</button>
       <button class="tab" role="tab" id="t-board" aria-selected="false" aria-controls="p-board">Rankings</button>
       <button class="tab" role="tab" id="t-model" aria-selected="false" aria-controls="p-model">Model</button>
     </nav>
@@ -223,6 +251,37 @@ summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--data-
     </div>
   </section>
 
+  <section class="panel" id="p-trades" role="tabpanel" aria-labelledby="t-trades" hidden>
+    <div class="banner" id="lbanner" hidden></div>
+    <div class="eyebrow">Rest of season, weeks <span id="wkRange"></span></div>
+    <h2 class="disp" style="font-size:40px;margin:4px 0 14px">What your team needs</h2>
+    <div class="needs" id="needs"></div>
+    <p class="note" id="needsNote"></p>
+    <div class="cols">
+      <div>
+        <div class="sech"><h2>Trade ideas</h2></div>
+        <div id="ideas"></div>
+        <p class="note">Only deals where the other team also gets better are listed, so someone might say yes. Grades come from how your best lineup changes every remaining week, with byes and matchups included.</p>
+        <div class="sech" style="margin-top:20px"><h2>Trade chips</h2></div>
+        <div class="chips2" id="chips"></div>
+      </div>
+      <div>
+        <div class="sech"><h2>Power rankings</h2></div>
+        <div id="power"></div>
+      </div>
+    </div>
+    <div class="sech" style="margin-top:28px"><h2>Grade a trade</h2></div>
+    <div class="grader">
+      <label class="eyebrow lbl" for="partner">Trade with</label>
+      <select id="partner"></select>
+      <div class="pick">
+        <div><span class="eyebrow lbl">You give</span><div class="pl" id="giveList"></div></div>
+        <div><span class="eyebrow lbl">You get</span><div class="pl" id="getList"></div></div>
+      </div>
+      <div id="verdict"><p class="empty">Check the players on each side to see the grade.</p></div>
+    </div>
+  </section>
+
   <section class="panel" id="p-board" role="tabpanel" aria-labelledby="t-board" hidden>
     <div class="bar">
       <div class="seg" id="posSeg" role="group" aria-label="Position"></div>
@@ -274,7 +333,7 @@ const hasTeam = !D.team.example;
 $("#stamp").textContent = `WK ${D.week} · ${D.season}`;
 
 // Tabs
-const tabs = ["team", "board", "model"];
+const tabs = ["team", "trades", "board", "model"];
 function showTab(id) {
   for (const t of tabs) {
     $("#t-" + t).setAttribute("aria-selected", String(t === id));
@@ -446,6 +505,55 @@ $("#chart").innerHTML = '<div class="note" style="margin:0 0 4px">Average miss i
     `<div class="brow" title="${posName(a.pos)} ${n}: ${a[k].toFixed(2)}"><div class="btrack"><div class="bfill" style="width:${(a[k] / accMax) * 100}%;background:${c}"></div></div><span class="num">${a[k].toFixed(2)}</span></div>`).join("")}</div></div>`).join("");
 $("#accTable").innerHTML = `<thead><tr><th>Position</th>${MODELS.map(([, n]) => `<th class="r">${n}</th>`).join("")}</tr></thead><tbody>` +
   D.acc.map((a) => `<tr><td>${posName(a.pos)}</td>${MODELS.map(([k]) => `<td class="r num">${a[k].toFixed(2)}</td>`).join("")}</tr>`).join("") + "</tbody>";
+
+// Trades
+const L = D.league, Lw = L.weeks.length;
+const lteams = L.teams.map((t) => ({ ...t, roster: t.roster.map((p) => ({ name: p.n, pos: p.p, team: p.t, w: p.w })) }));
+const myTeam = lteams.find((t) => t.mine);
+const GR_CLASS = (g) => g[0];
+const ordinal = (n) => n + ([11, 12, 13].includes(n % 100) ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] ?? "th"));
+$("#wkRange").textContent = `${L.weeks[0]} to ${L.weeks.at(-1)}`;
+if (L.example) {
+  $("#lbanner").hidden = false;
+  $("#lbanner").innerHTML = "<span>This is an example league (a simulated draft), not yours. Your real league unlocks once all teams are loaded.</span>";
+}
+$("#needs").innerHTML = L.needs.map((x, i) => `<div class="need${i === 0 ? " top" : ""}"><div class="row1"><span class="p">${posName(x.pos)}</span><span class="gr ${GR_CLASS(x.grade)}">${x.grade}</span></div>
+  <div class="eyebrow">${i === 0 ? "Biggest need · " : ""}${ordinal(x.rank)} of ${x.of} teams</div>
+  <small>${x.perWeek.toFixed(1)} pts/wk from your ${posName(x.pos)} starters</small>
+  <small>A solid starter adds <strong>+${Math.max(0, x.solidGain).toFixed(1)}</strong>/wk${x.solid ? ` (${esc(x.solid)})` : ""}. A star adds <strong>+${Math.max(0, x.starGain).toFixed(1)}</strong>${x.star ? ` (${esc(x.star)})` : ""}.</small></div>`).join("");
+$("#needsNote").textContent = "Grade is where your starters at that position rank among all teams. The upgrade numbers are how many points per week your lineup gains from adding that kind of player.";
+const f1 = (x) => (x >= 0 ? "+" : "") + x.toFixed(1);
+$("#ideas").innerHTML = L.ideas.map((t) => `<div class="idea"><div class="gr ${GR_CLASS(t.grade)}">${t.grade}</div>
+  <div><strong>Give ${esc(t.give.join(" + "))}</strong> for <strong>${esc(t.get.join(" + "))}</strong></div>
+  <small>${esc(t.partner)} · you ${f1(t.myDelta)}/wk (${f1(t.seasonPoints)} on the season) · them ${f1(t.theirDelta)}/wk${t.dropped.length ? ` · you drop ${esc(t.dropped.join(", "))}` : ""}</small></div>`).join("") ||
+  '<p class="empty">No deal found where both teams improve. Use the grader below.</p>';
+$("#chips").innerHTML = L.chips.map((c) => `<span class="bchip">${esc(c.name)} <span class="tag2">${posName(c.pos)}</span><span class="num">wanted by ${c.wantedBy}</span></span>`).join("") || '<p class="empty">No clear surplus on your roster.</p>';
+const pmax = Math.max(...L.power.map((t) => t.value)), pmin = Math.min(...L.power.map((t) => t.value));
+$("#power").innerHTML = L.power.map((t, i) => `<div class="rank${t.mine ? " me" : ""}"><span class="num">${i + 1}</span><div>${esc(t.name)}<div class="bar2"><i style="width:${30 + ((t.value - pmin) / Math.max(1, pmax - pmin)) * 70}%"></i></div></div><span class="num">${t.value.toFixed(1)}</span></div>`).join("");
+
+// Trade grader
+$("#partner").innerHTML = lteams.filter((t) => !t.mine).map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join("");
+const listHtml = (team, kind) => team.roster.slice().sort((a, b) => b.w.reduce((x, y) => x + y, 0) - a.w.reduce((x, y) => x + y, 0)).map((p) =>
+  `<label><input type="checkbox" data-k="${kind}" value="${esc(p.name)}"> ${esc(p.name)} <span class="tag2">${posName(p.pos)}</span><span class="num">${(p.w.reduce((x, y) => x + y, 0) / Lw).toFixed(1)}/wk</span></label>`).join("");
+function renderPick() {
+  const partner = lteams.find((t) => String(t.id) === $("#partner").value);
+  $("#giveList").innerHTML = listHtml(myTeam, "give");
+  $("#getList").innerHTML = listHtml(partner, "get");
+  grade();
+}
+function grade() {
+  const partner = lteams.find((t) => String(t.id) === $("#partner").value);
+  const sel = (k, team) => [...document.querySelectorAll(`input[data-k="${k}"]:checked`)].map((i) => team.roster.find((p) => p.name === i.value));
+  const give = sel("give", myTeam), get = sel("get", partner);
+  if (!give.length || !get.length) { $("#verdict").innerHTML = '<p class="empty">Check the players on each side to see the grade.</p>'; return; }
+  const r = evaluateTrade(myTeam, partner, give, get, L.slots, Lw);
+  $("#verdict").innerHTML = `<div class="verdict"><div class="gr ${GR_CLASS(r.grade)}">${r.grade}</div><div>
+    <strong>${esc(r.verdict)}</strong>
+    <div class="note" style="margin-top:4px">You: <strong>${f1(r.myDelta)}</strong> pts/week (${f1(r.seasonPoints)} over the rest of the season). ${esc(partner.name)}: <strong>${f1(r.theirDelta)}</strong> pts/week. ${r.likelyAccepted ? "They should consider it." : "They will probably decline."}${r.dropped.length ? ` You would have to drop ${esc(r.dropped.join(", "))}.` : ""}</div></div></div>`;
+}
+$("#partner").addEventListener("change", renderPick);
+$("#p-trades").addEventListener("change", (e) => { if (e.target.matches("input[type=checkbox]")) grade(); });
+renderPick();
 
 renderBanner(); renderTeam(); renderRows();
 const start = location.hash.slice(1);

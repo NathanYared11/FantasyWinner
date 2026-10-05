@@ -12,17 +12,19 @@ const week = Number(process.argv[3]) || last.week + 1;
 const topN = Number(process.argv[4]) || 15;
 const def = buildDefenseIndex(stats);
 
-export function projectWeek({ stats, games, injuries, models, season, week, def }) {
+// featureWeek: the week whose "as of" state the features describe (rest-of-season projections reuse the
+// next unplayed week so the rest-gap feature does not grow just because the target week is further out).
+export function projectWeek({ stats, games, injuries, models, season, week, def, featureWeek = week }) {
   const out = [];
-  const idx = (season - 2000) * 18 + week;
-  for (const hist of groupByPlayer(stats.filter((r) => r.idx < idx)).values()) {
+  const idx = (season - 2000) * 18 + week, fIdx = (season - 2000) * 18 + featureWeek;
+  for (const hist of groupByPlayer(stats.filter((r) => r.idx < fIdx)).values()) {
     const lastGame = hist.at(-1);
     const game = games.get(`${season}|${week}|${lastGame.team}`);
     const env = gameFor({ ...lastGame, season, week }, games);
-    if (!game || idx - lastGame.idx > 4) continue; // no game scheduled, or not recently active
-    const injury = injuries.get(`${season}|${week}|${lastGame.id}`) ?? 0;
+    if (!game || fIdx - lastGame.idx > 4) continue; // no game scheduled, or not recently active
+    const injury = week === featureWeek ? injuries.get(`${season}|${week}|${lastGame.id}`) ?? 0 : 0;
     if (injury === 3) continue; // ruled Out
-    const x = featureVector(hist, { idx, opp: game.opp, pos: lastGame.pos, game: env, injury, def });
+    const x = featureVector(hist, { idx: fIdx, opp: game.opp, pos: lastGame.pos, game: env, injury, def });
     const m = models.positions[lastGame.pos];
     if (!x || !m) continue;
     const mean = Math.max(0, predictRidge(m, x));
