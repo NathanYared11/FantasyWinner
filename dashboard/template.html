@@ -1,0 +1,316 @@
+<title>FantasyWinner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: one column, sticky tab bar; projections table, then a roster-in/lineup-out tool, then the model's report card. */
+:root {
+  --bg: #f4f7f6; --surface: #ffffff; --ink: #12201c; --ink2: #4b5c56; --muted: #6f7f79; --line: #dbe3df;
+  --accent: #2a78d6; --accent-ink: #1d5fb0; --accent-soft: #dce9fa; --on-accent: #ffffff;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --good: #1a7f4b; --warn: #a45f00; --crit: #c23b3a; --warn-soft: #fbeccf; --crit-soft: #f8dcdb;
+  --f-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "Spline Sans Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1613; --surface: #151f1c; --ink: #eef3f1; --ink2: #b4c2bc; --muted: #8a9a94; --line: #263430;
+    --accent: #3987e5; --accent-ink: #7db2f0; --accent-soft: #1b3350; --on-accent: #0b1220;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --good: #4cc38a; --warn: #e0a339; --crit: #ee7a78; --warn-soft: #3a2d12; --crit-soft: #3d1f1f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1613; --surface: #151f1c; --ink: #eef3f1; --ink2: #b4c2bc; --muted: #8a9a94; --line: #263430;
+  --accent: #3987e5; --accent-ink: #7db2f0; --accent-soft: #1b3350; --on-accent: #0b1220;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --good: #4cc38a; --warn: #e0a339; --crit: #ee7a78; --warn-soft: #3a2d12; --crit-soft: #3d1f1f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 15px/1.5 var(--f-body); }
+.wrap { max-width: 1040px; margin-inline: auto; padding-inline: 16px; padding-block: 20px 56px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 30px; line-height: 1.1; }
+h2 { font-size: 20px; }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 8px 24px; margin-bottom: 16px; }
+.head p { margin: 4px 0 0; color: var(--ink2); }
+.stamp { font: 500 12px var(--f-mono); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); display: flex; gap: 4px; padding-block: 8px; border-bottom: 1px solid var(--line); margin-bottom: 20px; overflow-x: auto; }
+.tab { font: 600 14px var(--f-body); color: var(--ink2); background: none; border: 0; padding: 8px 14px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.tab[aria-selected="true"] { background: var(--accent); color: var(--on-accent); }
+.tab:not([aria-selected="true"]):hover { background: var(--accent-soft); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+.panel[hidden] { display: none; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.seg button { font: 500 13px var(--f-body); color: var(--ink2); background: none; border: 0; padding: 7px 11px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+input[type=search], select, textarea { font: 400 14px var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; }
+input[type=search] { width: min(260px, 100%); }
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { text-align: left; font: 600 11px var(--f-body); text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.r, th.r { text-align: right; }
+.pos { font: 500 11px var(--f-mono); color: var(--ink2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+.pill { font: 600 11px var(--f-body); border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
+.pill.q { background: var(--warn-soft); color: var(--warn); }
+.pill.d { background: var(--crit-soft); color: var(--crit); }
+.range { position: relative; width: 190px; height: 10px; }
+.range i { position: absolute; top: 3px; height: 4px; background: var(--accent-soft); border-radius: 2px; }
+.range b { position: absolute; top: 0; width: 3px; height: 10px; background: var(--accent); border-radius: 1px; margin-left: -1px; }
+.more { margin-top: 10px; font: 600 13px var(--f-body); color: var(--accent-ink); background: none; border: 0; cursor: pointer; padding: 4px 0; }
+.note { color: var(--muted); font-size: 13px; max-width: 70ch; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+textarea { width: 100%; min-height: 230px; font-family: var(--f-mono); font-size: 13px; line-height: 1.6; resize: vertical; }
+label.lbl { display: block; font: 600 11px var(--f-body); text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
+.result { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.total { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.total .num { font-size: 30px; font-weight: 500; }
+.slot { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.slot:last-child { border-bottom: 0; }
+.slot small { font: 500 11px var(--f-mono); color: var(--muted); }
+.warn { color: var(--warn); font-size: 12px; }
+.call { font-size: 13px; padding: 6px 0; color: var(--ink2); }
+h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 14px 0 4px; font-family: var(--f-body); font-weight: 600; }
+.tiles { display: flex; flex-wrap: wrap; gap: 24px 40px; margin: 6px 0 22px; }
+.tile .num { font-size: 28px; font-weight: 500; display: block; }
+.tile span.k { color: var(--ink2); font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 12px; font-size: 13px; color: var(--ink2); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.crow { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.crow:last-child { border-bottom: 0; }
+.crow > b { font: 500 13px var(--f-mono); padding-top: 1px; }
+.bars { display: grid; gap: 4px; }
+.brow { display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 8px; align-items: center; }
+.btrack { height: 10px; }
+.bfill { height: 100%; border-radius: 0 4px 4px 0; min-width: 2px; }
+.brow .num { font-size: 12px; color: var(--ink2); text-align: right; }
+details { margin-top: 14px; }
+summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--accent-ink); }
+.theme { background: none; border: 1px solid var(--line); color: var(--ink2); border-radius: 6px; font: 500 12px var(--f-body); padding: 5px 10px; cursor: pointer; }
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>FantasyWinner</h1>
+      <p id="sub"></p>
+    </div>
+    <div class="stamp" id="stamp"></div>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" id="t-proj" aria-selected="true" aria-controls="p-proj">Projections</button>
+    <button class="tab" role="tab" id="t-lineup" aria-selected="false" aria-controls="p-lineup">Lineup &amp; waivers</button>
+    <button class="tab" role="tab" id="t-model" aria-selected="false" aria-controls="p-model">Model accuracy</button>
+  </div>
+
+  <section class="panel" id="p-proj" role="tabpanel" aria-labelledby="t-proj">
+    <div class="bar">
+      <div class="seg" id="posSeg" role="group" aria-label="Position"></div>
+      <input type="search" id="q" placeholder="Search player or team" aria-label="Search players">
+    </div>
+    <div class="scroll"><table>
+      <thead><tr><th>#</th><th>Player</th><th>Matchup</th><th class="r">Proj</th><th>Likely range</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <button class="more" id="more" hidden></button>
+    <p class="note">Points are PPR. The bar shows an ~80% range of outcomes and the tick marks the projection. Ranges are wide because a single NFL week is noisy.</p>
+  </section>
+
+  <section class="panel" id="p-lineup" role="tabpanel" aria-labelledby="t-lineup" hidden>
+    <div class="grid2">
+      <div>
+        <label class="lbl" for="roster">Your roster (one per line: Name, POS)</label>
+        <textarea id="roster" spellcheck="false"></textarea>
+        <p class="note" id="rosterNote">Pre-filled with an example roster. Replace it with yours.</p>
+        <div class="bar" style="margin-top:12px">
+          <div>
+            <label class="lbl" for="preset">Lineup slots</label>
+            <select id="preset">
+              <option value="std">1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, K, D/ST</option>
+              <option value="sf">1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 SUPERFLEX, D/ST</option>
+              <option value="nok">1 QB, 2 RB, 2 WR, 1 TE, 2 FLEX, D/ST</option>
+            </select>
+          </div>
+          <div>
+            <span class="lbl">Optimize for</span>
+            <div class="seg" id="objSeg" role="group" aria-label="Objective">
+              <button data-o="floor" aria-pressed="false">Safe floor</button>
+              <button data-o="mean" aria-pressed="true">Expected</button>
+              <button data-o="ceiling" aria-pressed="false">Ceiling</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="out"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-model" role="tabpanel" aria-labelledby="t-model" hidden>
+    <h2>How accurate is it?</h2>
+    <p class="note">Every week from 2024 through 2026 week 4 was predicted using only earlier games, for fantasy-relevant players. Lower error is better.</p>
+    <div class="tiles">
+      <div class="tile"><span class="num" id="tMae"></span><span class="k">average miss, in points (model)</span></div>
+      <div class="tile"><span class="num" id="tBase"></span><span class="k">average miss using recent form</span></div>
+      <div class="tile"><span class="num" id="tRank"></span><span class="k">weekly ranking correlation (recent form 0.44)</span></div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="chart" id="chart"></div>
+    <details><summary>Show as table</summary>
+      <div class="scroll" style="margin-top:8px"><table id="accTable"></table></div>
+    </details>
+    <p class="note" style="margin-top:14px">The model is a ridge regression per position. It uses recent scoring, carries, targets and target share, Vegas implied team points, home/away, injury report status, and how many points the opposing defense has been allowing. Kickers and defenses are barely predictable week to week. Treat them as streaming picks. The test only includes players who actually played, so surprise inactives are not priced in.</p>
+  </section>
+  <p style="margin-top:28px"><button class="theme" id="themeBtn">Switch theme</button></p>
+</div>
+
+<script>
+const D = __DATA__;
+__LINEUP__
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const normName = (n) => n.toLowerCase().replace(/[.'’`]/g, "").replace(/\b(jr|sr|ii|iii|iv|v)\b/g, "").replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+const POS_LABEL = { DST: "D/ST" };
+const posName = (p) => POS_LABEL[p] ?? p;
+
+$("#sub").textContent = `Week ${D.week} projections for the ${D.season} season, built from NFL results through week ${D.week - 1}.`;
+$("#stamp").textContent = `Data through ${D.season} wk ${D.week - 1}`;
+
+// Tabs
+const tabs = ["proj", "lineup", "model"];
+function showTab(id) {
+  for (const t of tabs) {
+    $("#t-" + t).setAttribute("aria-selected", String(t === id));
+    $("#p-" + t).hidden = t !== id;
+  }
+  if (location.hash.slice(1) !== id) history.replaceState(null, "", "#" + id);
+  store.set("fw-tab", id);
+}
+for (const t of tabs) $("#t-" + t).addEventListener("click", () => showTab(t));
+
+// Projections
+let pos = "ALL", limit = 25;
+const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DST"];
+$("#posSeg").innerHTML = POSITIONS.map((p) => `<button data-p="${p}" aria-pressed="${p === pos}">${p === "ALL" ? "All" : posName(p)}</button>`).join("");
+$("#posSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  pos = b.dataset.p; limit = 25;
+  document.querySelectorAll("#posSeg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  renderRows();
+});
+$("#q").addEventListener("input", () => { limit = 25; renderRows(); });
+$("#more").addEventListener("click", () => { limit += 50; renderRows(); });
+
+function renderRows() {
+  const q = $("#q").value.trim().toLowerCase();
+  const all = D.players.filter((p) => (pos === "ALL" || p.p === pos) && (!q || p.n.toLowerCase().includes(q) || p.t.toLowerCase() === q));
+  const max = Math.max(20, ...all.map((p) => p.h));
+  $("#rows").innerHTML = all.slice(0, limit).map((p, i) => {
+    const inj = p.q === 1 ? '<span class="pill q">Questionable</span>' : p.q === 2 ? '<span class="pill d">Doubtful</span>' : "";
+    return `<tr><td class="num">${i + 1}</td><td><strong>${esc(p.n)}</strong><span class="pos">${posName(p.p)}</span>${inj}</td>
+      <td>${p.t} vs ${p.o}</td><td class="r num"><strong>${p.m.toFixed(1)}</strong></td>
+      <td><div class="range" title="${p.l.toFixed(0)} to ${p.h.toFixed(0)} points"><i style="left:${(p.l / max) * 100}%;width:${((p.h - p.l) / max) * 100}%"></i><b style="left:${(p.m / max) * 100}%"></b></div></td></tr>`;
+  }).join("") || `<tr><td colspan="5">No players match.</td></tr>`;
+  const more = $("#more");
+  more.hidden = all.length <= limit;
+  more.textContent = `Show more (${all.length - limit} left)`;
+}
+
+// Lineup
+const PRESETS = {
+  std: { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, DST: 1, K: 1 },
+  sf: { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, SUPERFLEX: 1, DST: 1 },
+  nok: { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 2, DST: 1 },
+};
+const byKey = new Map(D.players.map((p) => [normName(p.n) + "|" + p.p, p]));
+const byName = new Map(D.players.map((p) => [normName(p.n), p]));
+const SAMPLE = D.sample.map((s) => `${s.n}, ${s.p}`).join("\n");
+let objective = "mean";
+$("#roster").value = store.get("fw-roster") ?? SAMPLE;
+if (store.get("fw-roster")) $("#rosterNote").textContent = "Saved in this browser.";
+
+function parseRoster() {
+  const out = [];
+  for (const line of $("#roster").value.split("\n")) {
+    const m = line.trim().match(/^(.+?)(?:[,\s]+(QB|RB|WR|TE|K|DST|DEF|D\/ST))?$/i);
+    if (!m) continue;
+    let name = m[1].replace(/[,\s]+$/, ""), p = (m[2] ?? "").toUpperCase().replace("D/ST", "DST").replace("DEF", "DST");
+    const hit = (p && byKey.get(normName(name) + "|" + p)) || byName.get(normName(name));
+    out.push(hit ? { name: hit.n, pos: hit.p, mean: hit.m, low: hit.l, high: hit.h, ok: true } : { name, pos: p || "WR", mean: 0, low: 0, high: 0, ok: false });
+  }
+  return out;
+}
+
+function renderLineup() {
+  const roster = parseRoster();
+  if (!roster.length) { $("#out").innerHTML = '<div class="result"><p class="note">Add players on the left. Your lineup appears here.</p></div>'; return; }
+  const res = optimizeLineup(roster, PRESETS[$("#preset").value], objective);
+  const f = (p) => `${p.mean.toFixed(1)} <small>${p.low.toFixed(0)}-${p.high.toFixed(0)}</small>`;
+  const row = (slot, p) => `<div class="slot"><small>${slot}</small><span>${esc(p.name)} <span class="pos">${posName(p.pos)}</span>${p.ok ? "" : '<br><span class="warn">No projection found. Check the spelling.</span>'}</span><span class="num">${f(p)}</span></div>`;
+  const calls = closeCalls(res).slice(0, 4).map((c) => `<div class="call"><strong>${esc(c.starter.name)}</strong> over <strong>${esc(c.bench.name)}</strong> is close (${c.starter.mean.toFixed(1)} vs ${c.bench.mean.toFixed(1)}). Ceilings are ${c.starter.high.toFixed(0)} and ${c.bench.high.toFixed(0)}.</div>`).join("");
+  const label = { floor: "safe-floor", mean: "expected", ceiling: "ceiling" }[objective];
+  $("#out").innerHTML = `<div class="result">
+    <div class="total"><span class="num">${res.total.toFixed(1)}</span><span class="note">points, ${label} lineup for week ${D.week}</span></div>
+    <h3>Start</h3>${res.starters.map(({ slot, player }) => row(slot, player)).join("")}
+    <h3>Bench</h3>${res.bench.map((p) => row("BN", p)).join("") || '<p class="note">Nobody on the bench.</p>'}
+    ${calls ? `<h3>Close calls</h3>${calls}` : ""}
+    <h3>Waiver adds</h3>${waiverHtml(roster)}
+  </div>`;
+}
+
+function waiverHtml(roster) {
+  const have = new Set(roster.map((p) => normName(p.name)));
+  const pool = D.players.filter((p) => !have.has(normName(p.n)) && p.m >= 5 && p.q < 2).map((p) => ({ name: p.n, pos: p.p, mean: p.m, low: p.l, high: p.h, ok: true }));
+  const top = waiverTargets(roster, pool.slice(0, 220), PRESETS[$("#preset").value], { top: 4, objective });
+  if (!top.length) return '<p class="note">No available player would improve this lineup.</p>';
+  return top.map(({ player, gain }) => `<div class="slot"><small>+${gain.toFixed(1)}</small><span>${esc(player.name)} <span class="pos">${posName(player.pos)}</span></span><span class="num">${player.mean.toFixed(1)}</span></div>`).join("") +
+    '<p class="note">Assumes anyone not on your roster is available. Check your league\'s free agents.</p>';
+}
+
+$("#roster").addEventListener("input", () => { store.set("fw-roster", $("#roster").value); $("#rosterNote").textContent = "Saved in this browser."; renderLineup(); });
+$("#preset").addEventListener("change", renderLineup);
+$("#objSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  objective = b.dataset.o;
+  document.querySelectorAll("#objSeg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  renderLineup();
+});
+
+// Model accuracy (lower is better)
+const MODELS = [["model", "Model", "var(--s1)"], ["recent", "Recent form", "var(--s2)"], ["avg", "16-game average", "var(--s3)"]];
+$("#tMae").textContent = D.overall.mae[0].toFixed(2);
+$("#tBase").textContent = D.overall.mae[1].toFixed(2);
+$("#tRank").textContent = D.overall.rank[0].toFixed(2);
+$("#legend").innerHTML = MODELS.map(([, n, c]) => `<span><i style="background:${c}"></i>${n}</span>`).join("");
+const accMax = Math.max(...D.acc.flatMap((a) => [a.model, a.recent, a.avg]));
+$("#chart").innerHTML = '<div class="note" style="margin:0 0 6px">Average miss in points per player-week, by position</div>' +
+  D.acc.map((a) => `<div class="crow"><b>${posName(a.pos)}</b><div class="bars">${MODELS.map(([k, n, c]) =>
+    `<div class="brow" title="${posName(a.pos)} ${n}: ${a[k].toFixed(2)}"><div class="btrack"><div class="bfill" style="width:${(a[k] / accMax) * 100}%;background:${c}"></div></div><span class="num">${a[k].toFixed(2)}</span></div>`).join("")}</div></div>`).join("");
+$("#accTable").innerHTML = `<thead><tr><th>Position</th>${MODELS.map(([, n]) => `<th class="r">${n}</th>`).join("")}</tr></thead><tbody>` +
+  D.acc.map((a) => `<tr><td>${posName(a.pos)}</td>${MODELS.map(([k]) => `<td class="r num">${a[k].toFixed(2)}</td>`).join("")}</tr>`).join("") + "</tbody>";
+
+// Theme toggle
+$("#themeBtn").addEventListener("click", () => {
+  const r = document.documentElement, dark = getComputedStyle(r).colorScheme.includes("dark");
+  r.setAttribute("data-theme", dark ? "light" : "dark");
+});
+
+renderRows(); renderLineup();
+const start = location.hash.slice(1);
+showTab(tabs.includes(start) ? start : tabs.includes(store.get("fw-tab")) ? store.get("fw-tab") : "proj");
+</script>

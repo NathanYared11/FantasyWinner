@@ -62,3 +62,8 @@ node scripts/lineup.js 5 mean --roster roster.json
 ```
 
 The live ESPN path (`espn.js` plus the ID mappings in `espn-roster.js`) is untested against ESPN's servers: they are not reachable from the development sandbox. The optimizer, matching and projection code are covered by tests.
+
+## Dashboard and projection log
+
+- `node scripts/build-dashboard.js [season] [week]` builds `dashboard/dist/index.html` (projections table, roster-to-lineup tool with waiver adds, model accuracy). Rebuild it each week after `scripts/fetch-data.sh`.
+- `node scripts/log-projections.js` snapshots this week's projections from the model and Sleeper into `logs/` (run it before games; commit the files). After the games, `node scripts/blend-report.js` scores each source and the equal/tuned blends against actual points, so you can see whether blending Sleeper with the model beats either alone.

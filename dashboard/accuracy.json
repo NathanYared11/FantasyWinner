@@ -1,0 +1,2 @@
+{"overall":{"mae":[5.433,5.663,6.047],"rank":[0.481,0.439,0.429]},
+ "acc":[{"pos":"QB","model":6.400,"recent":6.652,"avg":6.793},{"pos":"RB","model":5.786,"recent":5.970,"avg":6.002},{"pos":"WR","model":5.801,"recent":5.990,"avg":6.000},{"pos":"TE","model":5.181,"recent":5.444,"avg":5.346},{"pos":"K","model":3.845,"recent":4.032,"avg":3.958},{"pos":"DST","model":3.633,"recent":4.187,"avg":4.022}]}
