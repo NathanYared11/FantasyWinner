@@ -26,7 +26,7 @@ export function projectWeek({ stats, games, injuries, models, season, week, def 
     const m = models.positions[lastGame.pos];
     if (!x || !m) continue;
     const mean = Math.max(0, predictRidge(m, x));
-    out.push({ name: lastGame.name, pos: lastGame.pos, team: lastGame.team, opp: game.opp, mean, low: Math.max(0, mean - 1.28 * m.residualSd), high: mean + 1.28 * m.residualSd, injury });
+    out.push({ name: lastGame.name, pos: lastGame.pos, team: lastGame.team, opp: game.opp, spread: game.spread, total: game.total, home: game.home, mean, low: Math.max(0, mean - 1.28 * m.residualSd), high: mean + 1.28 * m.residualSd, injury });
   }
   return out.sort((a, b) => b.mean - a.mean);
 }

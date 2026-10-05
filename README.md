@@ -67,3 +67,11 @@ The live ESPN path (`espn.js` plus the ID mappings in `espn-roster.js`) is untes
 
 - `node scripts/build-dashboard.js [season] [week]` builds `dashboard/dist/index.html` (projections table, roster-to-lineup tool with waiver adds, model accuracy). Rebuild it each week after `scripts/fetch-data.sh`.
 - `node scripts/log-projections.js` snapshots this week's projections from the model and Sleeper into `logs/` (run it before games; commit the files). After the games, `node scripts/blend-report.js` scores each source and the equal/tuned blends against actual points, so you can see whether blending Sleeper with the model beats either alone.
+
+### Using your own team
+
+`node scripts/build-dashboard.js` bakes your team into the dashboard. In order of preference:
+
+1. Live ESPN: `ESPN_LEAGUE_ID=… ESPN_TEAM_ID=… [ESPN_S2=… ESPN_SWID=…] node scripts/build-dashboard.js` (uses your league's lineup slots and real free agents).
+2. `dashboard/roster.json` (git-ignored): `{ "team": "Team name", "roster": [{"name": "Josh Allen", "pos": "QB"}, ...], "slots": {"QB":1,"RB":2,"WR":2,"TE":1,"FLEX":1,"DST":1,"K":1}, "free": ["optional list of available players"] }`.
+3. Otherwise it shows a clearly labelled example roster. You can also paste a roster into the page itself; it is saved in your browser only.
