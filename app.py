@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import streamlit as st
 
@@ -11,10 +13,21 @@ st.set_page_config(page_title="FantasyWinner", page_icon="🏈", layout="wide")
 
 
 def secret(key, default=None):
+    """Read from Streamlit secrets, falling back to environment variables
+    (ESPN_S2, ESPN_SWID, TEAM_LEGOAT, TEAM_CUZFF) for cloud setups."""
     try:
         return st.secrets[key]
     except Exception:
-        return default
+        pass
+    env = {"espn_s2": "ESPN_S2", "SWID": "ESPN_SWID"}.get(key)
+    return os.environ.get(env, default) if env else default
+
+
+def team_for(league_key):
+    try:
+        return st.secrets["teams"][league_key]
+    except Exception:
+        return os.environ.get(f"TEAM_{league_key.upper()}")
 
 
 @st.cache_data(ttl=300, show_spinner="Loading from ESPN...")
@@ -30,7 +43,7 @@ st.sidebar.title("🏈 FantasyWinner")
 key = st.sidebar.radio("League", list(LEAGUES), format_func=lambda k: LEAGUES[k].name)
 lg = LEAGUES[key]
 s2, swid = secret("espn_s2"), secret("SWID")
-team_id = (secret("teams") or {}).get(key)
+team_id = team_for(key)
 live = bool(s2 and swid and team_id)
 st.sidebar.caption("🟢 Live ESPN data" if live else "🟡 Demo mode (sample data). Add ESPN cookies to go live.")
 with st.sidebar.expander("League rules"):
