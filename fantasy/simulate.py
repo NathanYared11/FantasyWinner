@@ -203,6 +203,8 @@ class Sim:
         scores = {w: base[w].copy() for w in self.weeks}     # untouched teams reuse cached draws (common random numbers)
         for t in overrides:
             for w in self.weeks:
+                if w == self.week:      # a move made now takes effect next week; this week's lineups are set
+                    continue
                 scores[w][:, self.tidx[t]] = self.team_week(t, rosters[t], w)
         for w in self.weeks:
             if w <= self.reg_end:

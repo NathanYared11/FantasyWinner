@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
 <style>
-  /* Layout: one scannable column. Summary odds first, then the matchup, ranked tables, and trade cards that open for detail. */
+  /* Layout: app shell. Header with league switch, a sticky tab bar, and one compact view per tab; nothing scrolls past about a screen. */
   :root {
     --bg: #eceff2; --surface: #fafbfc; --ink: #11171c; --muted: #58646f; --line: #d8dee3;
     --me: #2a78d6; --me-soft: #dce9f9; --bar: #aab7c3; --good: #1a7f4b; --warn: #a86a00; --crit: #c23a32;
@@ -16,49 +16,57 @@
     --bg: #0e1215; --surface: #161b1f; --ink: #edf1f4; --muted: #98a5b0; --line: #29313a;
     --me: #3987e5; --me-soft: #14283f; --bar: #4b5a68; --good: #4cc78a; --warn: #e0a23a; --crit: #ee7a72; --pill: #232b32; color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--f-body); padding-inline: 16px; padding-block: 18px 48px; }
-  .wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 18px; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--f-body); padding-inline: 16px; padding-block: 16px 40px; }
+  .app { max-width: 1040px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .app > *, .view > *, .grid2 > *, .md > * { min-width: 0; }
   h1, h2, h3, .num { font-family: var(--f-display); font-weight: 600; letter-spacing: .01em; margin: 0; }
-  h2 { font-size: 22px; text-transform: uppercase; letter-spacing: .06em; }
-  h3 { font-size: 20px; }
+  h2 { font-size: 20px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+  h3 { font-size: 19px; }
   .num { font-variant-numeric: tabular-nums; }
   .muted { color: var(--muted); }
   .small { font-size: 12.5px; }
-  header { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: end; justify-content: space-between; }
-  header h1 { font-size: 34px; text-transform: uppercase; line-height: 1; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: end; justify-content: space-between; }
+  header h1 { font-size: 30px; text-transform: uppercase; line-height: 1; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
   .seg button { font: 500 14px var(--f-body); color: var(--muted); background: none; border: 0; padding: 7px 14px; cursor: pointer; }
   .seg button[aria-pressed="true"] { background: var(--me); color: #fff; }
-  .seg button:focus-visible, summary:focus-visible { outline: 2px solid var(--me); outline-offset: 2px; }
+  button:focus-visible, [role="tab"]:focus-visible { outline: 2px solid var(--me); outline-offset: 2px; }
+  /* tab bar */
+  .tabbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 4px; margin-inline: -16px; padding-inline: 16px; }
+  [role="tablist"] { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+  [role="tablist"]::-webkit-scrollbar { display: none; }
+  [role="tab"] { font: 600 17px var(--f-display); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: none; border: 0; border-bottom: 3px solid transparent; padding: 9px 14px 8px; cursor: pointer; white-space: nowrap; margin-bottom: -1px; }
+  [role="tab"]:hover { color: var(--ink); }
+  [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--me); }
   .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
-  .panel > h2 { margin-bottom: 12px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
-  /* hero */
-  .hero { display: grid; gap: 14px; }
-  .hero .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; align-items: baseline; }
-  .hero .name { font-size: 30px; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 12px; }
+  .grid2.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  @media (max-width: 760px) { .grid2, .grid2.even { grid-template-columns: minmax(0, 1fr); } }
+  .view { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  /* stats */
+  .hero .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; align-items: baseline; margin-bottom: 12px; }
+  .hero .name { font-size: 28px; text-transform: none; letter-spacing: .01em; margin: 0; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
   @media (max-width: 560px) { .stats { grid-template-columns: repeat(2, 1fr); } }
   .stat { border-left: 3px solid var(--line); padding-left: 10px; }
   .stat.key { border-color: var(--me); }
   .stat .v { font-family: var(--f-display); font-size: 40px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; }
   .stat .l { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-  /* bar chart */
+  /* bars */
   .bars { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
   .bar { display: grid; grid-template-columns: minmax(96px, 190px) 1fr 52px; gap: 10px; align-items: center; font-size: 14px; }
   .bar .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bar.me .nm { font-weight: 600; }
-  .track { height: 16px; }
-  .fill { height: 100%; min-width: 2px; background: var(--bar); border-radius: 0 4px 4px 0; }
+  .track { height: 16px; position: relative; }
+  .fill { display: block; height: 100%; min-width: 2px; background: var(--bar); border-radius: 0 4px 4px 0; }
   .bar.me .fill { background: var(--me); }
   .bar .pv { text-align: right; font-variant-numeric: tabular-nums; }
-  /* range bars */
-  .range { position: relative; height: 12px; background: var(--pill); border-radius: 6px; margin: 6px 0 2px; }
-  .range i { position: absolute; top: 0; bottom: 0; border-radius: 6px; background: var(--bar); }
+  .mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); opacity: .6; }
+  .range { position: relative; height: 14px; background: var(--pill); border-radius: 7px; margin: 8px 0 2px; }
+  .range i { position: absolute; top: 0; bottom: 0; border-radius: 7px; background: var(--bar); }
   .range.me i { background: var(--me); }
   .range b { position: absolute; top: -3px; bottom: -3px; width: 3px; background: var(--ink); border-radius: 2px; }
-  .live { font-family: var(--f-display); font-size: 36px; font-variant-numeric: tabular-nums; }
+  .live { font-family: var(--f-display); font-size: 56px; line-height: 1; font-variant-numeric: tabular-nums; }
   /* tables */
   .tbl { overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: 14px; }
@@ -74,147 +82,226 @@
   .pill.good { color: var(--good); } .pill.warn { color: var(--warn); } .pill.crit { color: var(--crit); }
   .pill::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 6px; opacity: .85; }
   .pill.plain::before { display: none; }
-  /* trades */
-  details { border-top: 1px solid var(--line); padding: 10px 0; }
-  details:first-of-type { border-top: 0; }
-  summary { cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; list-style: none; }
-  summary::-webkit-details-marker { display: none; }
-  summary .t { font-family: var(--f-display); font-size: 21px; }
-  summary .delta { font-family: var(--f-display); font-size: 22px; color: var(--good); font-variant-numeric: tabular-nums; text-align: right; }
-  .why { color: var(--muted); font-size: 13.5px; margin: 8px 0; }
+  /* trades master-detail */
+  .md { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 12px; align-items: start; }
+  @media (max-width: 760px) { .md { grid-template-columns: minmax(0, 1fr); } }
+  .list { display: grid; gap: 6px; margin: 0; padding: 0 4px 0 0; list-style: none; max-height: calc(100vh - 190px); min-height: 360px; overflow-y: auto; }
+  @media (max-width: 760px) { .list { grid-auto-flow: column; grid-auto-columns: 210px; overflow-x: auto; overflow-y: hidden; max-height: none; min-height: 0; padding: 0 0 4px; } }
+  .item { width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 8px; padding: 9px 11px; cursor: pointer; font: inherit; color: inherit; display: grid; gap: 1px; }
+  .item[aria-pressed="true"] { border-left-color: var(--me); background: var(--me-soft); }
+  .item .t { font-family: var(--f-display); font-size: 19px; line-height: 1.15; }
+  .item .d { font-family: var(--f-display); font-size: 18px; color: var(--good); font-variant-numeric: tabular-nums; }
   .offers td:first-child { text-transform: uppercase; font-size: 12px; letter-spacing: .06em; color: var(--muted); white-space: nowrap; }
   .offers .bad { color: var(--crit); }
-  ul.plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  .foot { font-size: 13px; color: var(--muted); }
-  .foot p { margin: 4px 0; max-width: 78ch; }
-  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
-  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .before-after { display: flex; align-items: baseline; gap: 10px; margin: 8px 0 4px; }
+  .before-after .big { font-family: var(--f-display); font-size: 40px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .why { color: var(--muted); font-size: 14px; margin: 6px 0 10px; max-width: 70ch; }
+  ul.plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+  .todo li { border-left: 3px solid var(--me); padding-left: 10px; }
+  .prose p { margin: 0 0 10px; max-width: 72ch; }
 </style>
 
-<div class="wrap">
+<div class="app">
   <header>
     <div>
       <h1>League Front Office</h1>
       <div class="muted small" id="fresh"></div>
     </div>
-    <div class="seg" id="tabs" role="group" aria-label="League"></div>
+    <div class="seg" id="leagues" role="group" aria-label="League"></div>
   </header>
-  <main id="app" class="wrap" style="gap:18px"></main>
+  <div class="tabbar"><div role="tablist" id="tabs" aria-label="Dashboard sections"></div></div>
+  <main id="view" class="view" role="tabpanel"></main>
 </div>
 
 <script>
 const DATA = /*DATA*/;
 const $ = (s, el = document) => el.querySelector(s);
 const pct = (x, d = 0) => (x * 100).toFixed(d) + "%";
+const sgn = (x, d = 1) => (x >= 0 ? "+" : "") + x.toFixed(d);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const leagues = Object.keys(DATA);
-let current = leagues.includes(location.hash.slice(1)) ? location.hash.slice(1) : leagues[0];
-let metric = "title";
-const METRICS = [["title", "Title"], ["final", "Title game"], ["bye", "Bye"], ["playoffs", "Playoffs"]];
+const TABS = [["overview", "Overview"], ["matchup", "Matchup"], ["standings", "Standings"], ["team", "My team"], ["trades", "Trades"], ["market", "Waivers & market"], ["about", "About"]];
+const S = { league: leagues[0], tab: "overview", metric: "title", sel: 0 };
+(function fromHash() {
+  const [l, t] = location.hash.slice(1).split("-");
+  if (leagues.includes(l)) S.league = l;
+  if (TABS.some(x => x[0] === t)) S.tab = t;
+})();
 
-function tier(t) { return t.startsWith("CRITICAL") ? "crit" : t.startsWith("Major") ? "warn" : t.startsWith("No") ? "good" : "plain"; }
-function klass(k) { return { "BUY LOW": "good", "REALISTIC TARGET": "good", "PREMIUM TARGET": "warn", "DREAM TARGET": "warn", "DEPTH TARGET": "plain", "AVOID": "crit" }[k] || "plain"; }
+const tierCls = t => t.startsWith("CRITICAL") ? "crit" : t.startsWith("Major") ? "warn" : t.startsWith("No") ? "good" : "plain";
+const kindCls = k => ({ "BUY LOW": "good", "REALISTIC TARGET": "good", "PREMIUM TARGET": "warn", "DREAM TARGET": "warn", "AVOID": "crit" }[k] || "plain");
+const kindLabel = k => k.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+
+const V = {
+  overview(D, me) {
+    const METRICS = [["title", "Title"], ["final", "Title game"], ["bye", "Bye"], ["playoffs", "Playoffs"]];
+    const sorted = [...D.teams].sort((a, b) => b[S.metric] - a[S.metric]);
+    const maxV = Math.max(...sorted.map(t => t[S.metric]), .01);
+    const threats = D.teams.filter(t => !t.me).sort((a, b) => b.title - a.title).slice(0, 3);
+    const t0 = D.trades[0], w0 = D.waivers[0];
+    return `
+    <section class="panel hero">
+      <div class="top"><h2 class="name">${esc(me.name)}</h2>
+        <div class="muted">Record ${esc(me.record)} · standing ${me.standing} of ${D.teams.length} · roster score ${me.roster.toFixed(0)} · ${D.cutoff.seed}-team cutoff: ${esc(D.cutoff.team)} (${esc(D.cutoff.record)})</div></div>
+      <div class="stats">
+        <div class="stat"><div class="v">${pct(me.playoffs)}</div><div class="l">Make playoffs</div></div>
+        <div class="stat"><div class="v">${pct(me.bye)}</div><div class="l">First-round bye</div></div>
+        <div class="stat"><div class="v">${pct(me.final)}</div><div class="l">Title game</div></div>
+        <div class="stat key"><div class="v">${pct(me.title, 1)}</div><div class="l">Win the league</div></div>
+      </div>
+    </section>
+    <div class="grid2">
+      <section class="panel">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <h2 style="margin:0">League odds</h2>
+          <div class="seg" id="metrics" role="group" aria-label="Odds metric">${METRICS.map(([k, l]) => `<button data-m="${k}" aria-pressed="${k === S.metric}">${l}</button>`).join("")}</div>
+        </div>
+        <ul class="bars">${sorted.map(t => `<li class="bar ${t.me ? "me" : ""}" title="${esc(t.name)}: playoffs ${pct(t.playoffs)}, bye ${pct(t.bye)}, title game ${pct(t.final)}, title ${pct(t.title, 1)}">
+          <span class="nm">${esc(t.name)}</span><span class="track"><span class="fill" style="width:${t[S.metric] / maxV * 100}%"></span></span><span class="pv">${pct(t[S.metric], S.metric === "title" ? 1 : 0)}</span></li>`).join("")}</ul>
+      </section>
+      <div class="view">
+        <section class="panel todo">
+          <h2>Best moves right now</h2>
+          <ul class="plain">
+            ${t0 ? `<li><b>Trade for ${esc(t0.target)}</b> (${esc(t0.pos)}, ${esc(t0.owner)})<br><span class="muted small">Offer ${esc(t0.offers.fair.give)} · ${pct(t0.offers.fair.accept)} chance they accept · title odds ${pct(me.title, 1)} → ${pct(t0.offers.fair.title_after, 1)}</span></li>` : ""}
+            ${w0 ? `<li><b>Add ${esc(w0.add)}</b><br><span class="muted small">Drop ${esc(w0.drop)} · title odds ${sgn(w0.d_title * 100, 2)} pts</span></li>` : ""}
+          </ul>
+        </section>
+        <section class="panel">
+          <h2>Biggest threats</h2>
+          <ul class="plain">${threats.map(t => `<li><b>${esc(t.name)}</b> <span class="num">${pct(t.title, 1)}</span><br><span class="muted small">${t.strengths.length ? "Strong at " + esc(t.strengths.slice(0, 3).join(", ")) : "No standout strength"}${t.weaknesses.length ? " · thin at " + esc(t.weaknesses.slice(0, 2).join(", ")) : ""}</span></li>`).join("")}</ul>
+        </section>
+      </div>
+    </div>`;
+  },
+
+  matchup(D) {
+    const m = D.matchup;
+    const decided = m.me[2] - m.me[0] < 1 && m.opp_q[2] - m.opp_q[0] < 1;
+    const mx = Math.max(m.me[2], m.opp_q[2], m.live_me, m.live_opp, 100) * 1.05;
+    const wk = q => `${q[0].toFixed(0)}–${q[2].toFixed(0)}`;
+    const rng = (q, cls) => `<div class="range ${cls}"><i style="left:${q[0] / mx * 100}%;width:${(q[2] - q[0]) / mx * 100}%"></i><b style="left:${q[1] / mx * 100}%"></b></div>`;
+    const wl = m.win >= .995 ? "≈100%" : m.win <= .005 ? "≈0%" : pct(m.win);
+    return `<section class="panel">
+      <h2>This week vs ${esc(m.opp)}</h2>
+      <div class="grid2 even">
+        <div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div><div class="live">${m.live_me.toFixed(1)}</div><div class="muted small">you, live</div></div>
+            <div><div class="live" style="color:var(--muted)">${m.live_opp.toFixed(1)}</div><div class="muted small">${esc(m.opp)}, live</div></div>
+          </div>
+          <div style="margin-top:18px"><span class="num" style="font-size:44px">${wl}</span> <span class="muted">${decided ? (m.win > .5 ? "won" : "lost") : "win chance"}${m.espn_win != null ? ` · ESPN shows ${pct(m.espn_win)}` : ""}</span></div>
+        </div>
+        <div>
+          ${decided ? `<p class="muted">Nobody left to play in your lineup, so this matchup is settled.</p>` : `<div class="small muted">Projected final: low, median, high</div>
+          ${rng(m.me, "me")}<div class="small">You ${wk(m.me)} · median ${m.me[1].toFixed(0)}</div>
+          ${rng(m.opp_q, "")}<div class="small">Opponent ${wk(m.opp_q)} · median ${m.opp_q[1].toFixed(0)}</div>`}
+          <div class="small muted" style="margin-top:14px">Still to play for you: ${m.pending.length ? esc(m.pending.join(", ")) : "nobody in your lineup"}</div>
+        </div>
+      </div></section>`;
+  },
+
+  standings(D) {
+    return `<section class="panel"><h2>Power rankings</h2>
+      <div class="tbl"><table>
+        <tr><th>#</th><th>Team</th><th>Record</th><th class="r">Exp. wins</th><th>Roster strength</th><th class="r">Title</th><th>Read</th></tr>
+        ${[...D.teams].sort((a, b) => a.power_rank - b.power_rank).map(t => `<tr class="${t.me ? "me" : ""}"><td class="num">${t.power_rank}</td><td>${esc(t.name)}</td><td class="num">${esc(t.record)}</td>
+          <td class="r">${t.xwins.toFixed(1)}</td><td><span class="mini"><i style="width:${t.roster}%"></i></span><span class="num">${t.roster.toFixed(0)}</span></td><td class="r">${pct(t.title, 1)}</td>
+          <td>${t.tag ? `<span class="pill ${t.tag.startsWith("LEGIT") ? "good" : "crit"}">${t.tag === "LEGIT CONTENDER" ? "Real contender" : "Record outruns roster"}</span> ` : ""}${t.luck !== "as expected" ? `<span class="pill plain">${t.luck === "LUCKY" ? "Lucky" : "Unlucky"}</span>` : ""}</td></tr>`).join("")}
+      </table></div>
+      <div class="small muted" style="margin-top:8px">Roster strength is 0–100 against this league's other rosters (50 is average). Expected wins counts how many teams you outscored each week.</div></section>`;
+  },
+
+  team(D, me) {
+    const cats = Object.entries(me.cats);
+    return `<div class="grid2 even">
+      <section class="panel"><h2>Roster scorecard</h2>
+        <ul class="bars">${cats.map(([k, v]) => `<li class="bar me" style="grid-template-columns:70px 1fr 40px"><span class="nm">${esc(k)}</span><span class="track"><span class="mid"></span><span class="fill" style="width:${v}%"></span></span><span class="pv">${v.toFixed(0)}</span></li>`).join("")}</ul>
+        <div class="small muted" style="margin-top:8px">0–100 against this league's rosters; the line is average. Health is the share of starter points that are healthy.</div>
+        ${me.injured.length ? `<h3 style="margin-top:14px">Injuries</h3><div class="small">${esc(me.injured.join(", "))}</div>` : ""}
+      </section>
+      <section class="panel"><h2>Where my team is thin</h2>
+        <div class="tbl"><table>
+          <tr><th>Slot</th><th class="r">Pts/g</th><th class="r">Rank</th><th>Need</th><th class="r">To top quarter</th></tr>
+          ${D.needs.map(n => `<tr><td>${esc(n.slot)}</td><td class="r">${n.mine}</td><td class="r">${n.rank}</td><td><span class="pill ${tierCls(n.tier)}">${esc(n.tier.replace(" opportunity", "").replace(" need", ""))}</span></td><td class="r">${n.gain_to_top_quartile > 0 ? "+" + n.gain_to_top_quartile : "–"}</td></tr>`).join("")}
+        </table></div>
+      </section></div>`;
+  },
+
+  trades(D, me) {
+    const T = D.trades;
+    if (!T.length) return `<section class="panel"><h2>Trades</h2><p class="muted">No trade is worth making right now.</p></section>`;
+    S.sel = Math.min(S.sel, T.length - 1);
+    const t = T[S.sel], f = t.offers.fair;
+    return `<div class="md">
+      <ul class="list">${T.map((x, i) => `<li><button class="item" data-i="${i}" aria-pressed="${i === S.sel}">
+        <span class="t">${esc(x.target)}</span><span class="muted small">${esc(x.pos)}, ${esc(x.nfl)} · ${esc(x.owner)}</span>
+        <span class="d">${sgn(x.offers.fair.d_title * 100)} pts</span></button></li>`).join("")}</ul>
+      <section class="panel">
+        <div style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline"><h2 style="margin:0;font-size:26px;text-transform:none;letter-spacing:.01em">${esc(t.target)}</h2>
+          <span class="pill ${kindCls(t.klass)}">${esc(kindLabel(t.klass))}</span><span class="muted small">${esc(t.pos)}, ${esc(t.nfl)} · owned by ${esc(t.owner)}</span></div>
+        <div class="before-after"><span class="muted small">Your title odds</span><span class="big">${pct(me.title, 1)} → ${pct(f.title_after, 1)}</span><span class="num" style="color:var(--good)">${sgn(f.d_title * 100)} pts</span></div>
+        <div class="why">Projects ${t.ppg} pts a game (range ${t.floor}–${t.ceil}). Lifts your lineup ${sgn(f.gain_me)} pts a week for the rest of the season; their lineup changes ${sgn(f.gain_them)}. ${t.gap > .5 ? "Managers price him below what he should score." : t.gap < -.5 ? "Managers price him above what he should score." : "Priced about right."}</div>
+        <div class="tbl"><table class="offers"><tr><th>Offer</th><th>You give</th><th class="r">They accept</th><th class="r">Your title odds</th></tr>
+        ${["opening", "fair", "aggressive", "maximum"].map(k => { const o = t.offers[k]; return o ? `<tr><td>${k}</td><td>${esc(o.give)}</td><td class="r">${pct(o.accept)}</td><td class="r ${o.d_title > 0 ? "" : "bad"}">${pct(o.title_after, 1)} (${sgn(o.d_title * 100)})${o.d_title > 0 ? "" : " ✕"}</td></tr>` : `<tr><td>${k}</td><td class="muted" colspan="3">no worthwhile offer at this level</td></tr>`; }).join("")}
+        </table></div>
+        <div class="small muted" style="margin-top:10px">Start at Opening and move down only if rejected. Acceptance chances are my own estimate, not measured. Gains from several trades do not add up.</div>
+      </section></div>`;
+  },
+
+  market(D) {
+    const partners = D.teams.filter(t => !t.me && t.partner != null).sort((a, b) => b.partner - a.partner).slice(0, 4);
+    return `<div class="grid2 even">
+      <div class="view">
+        <section class="panel"><h2>Waiver adds</h2>
+          <ul class="plain">${D.waivers.slice(0, 4).map(w => `<li><b>Add ${esc(w.add)}</b><br><span class="muted small">drop ${esc(w.drop)} · title odds ${sgn(w.d_title * 100, 2)} pts · playoffs ${sgn(w.d_playoffs * 100)} pts</span></li>`).join("")}</ul></section>
+        <section class="panel"><h2>Growing roles on waivers</h2>
+          <ul class="plain">${D.breakouts.map(b => `<li>${esc(b.name)} <span class="muted small">${esc(b.pos)}, ${esc(b.team)} · snaps ${(b.snap_season * 100).toFixed(0)}% → ${(b.snap_recent * 100).toFixed(0)}% · target share ${(b.target_share * 100).toFixed(0)}%</span></li>`).join("")}</ul></section>
+      </div>
+      <div class="view">
+        <section class="panel"><h2>Best trade partners</h2>
+          <ul class="plain">${partners.map(t => `<li><b>${esc(t.name)}</b> <span class="num">${t.partner.toFixed(0)}</span><br><span class="muted small">Surplus: ${esc(t.surplus.join(", ") || "none")} · needs: ${esc(t.demand.join(", ") || "none")}</span></li>`).join("")}</ul></section>
+        <section class="panel"><h2>Trade market by position</h2>
+          <div class="tbl"><table><tr><th>Pos</th><th>Has extra</th><th>Needs</th></tr>
+          ${Object.entries(D.market).map(([p, v]) => `<tr><td>${esc(p)}</td><td class="small">${esc(v.excess.join(", ") || "–")}</td><td class="small">${esc(v.needs.join(", ") || "–")}</td></tr>`).join("")}</table></div></section>
+      </div></div>`;
+  },
+
+  about(D) {
+    return `<section class="panel prose"><h2>How far to trust this</h2>
+      <p><b>Projections.</b> They blend ESPN's preseason number, this season so far, and last year. Tested on the 2025 season, held out from tuning, that beat plain season averages by about 2% a week and 5% over the next four weeks. Weekly fantasy scoring is mostly luck, so expect wide ranges.</p>
+      <p><b>Odds.</b> The rest of the season is simulated ${D.sims.toLocaleString()} times with real bye weeks, injury return rates and this league's seeding rule. They ignore future trades and waiver moves by other managers, so they run a little confident.</p>
+      <p><b>Trades.</b> Acceptance chances are a rule of thumb about perceived value and roster need, not a measurement. Gains from several trades do not add up.</p>
+      <p class="muted small">ESPN data ${esc(D.espn_refreshed)} · NFL data ${esc(D.nfl_refreshed)} · built ${esc(D.built)}. This is a snapshot, not a live feed.</p></section>`;
+  }
+};
 
 function render() {
-  const D = DATA[current], me = D.teams.find(t => t.me);
-  $("#fresh").textContent = `Week ${D.week} · ESPN data ${D.espn_refreshed.replace("T", " ").slice(0, 16)} UTC · NFL data ${D.nfl_refreshed.replace("T", " ").slice(0, 16)} UTC · ${D.sims.toLocaleString()} simulated seasons · a snapshot, not a live feed`;
-  $("#tabs").innerHTML = leagues.map(l => `<button aria-pressed="${l === current}" data-l="${l}">${esc(DATA[l].league)}</button>`).join("");
-  $("#tabs").onclick = e => { const b = e.target.closest("button"); if (b) { current = b.dataset.l; history.replaceState(null, "", "#" + current); render(); } };
-
-  const m = D.matchup, wk = (v) => `${(v[0]).toFixed(0)}–${(v[2]).toFixed(0)}`;
-  const scaleMax = Math.max(m.me[2], m.opp_q[2], m.live_me, m.live_opp, 100) * 1.05;
-  const rng = (q, live, cls) => `<div class="range ${cls}" aria-label="range ${wk(q)}"><i style="left:${q[0] / scaleMax * 100}%;width:${(q[2] - q[0]) / scaleMax * 100}%"></i><b style="left:${q[1] / scaleMax * 100}%"></b></div>`;
-  const sorted = [...D.teams].sort((a, b) => b[metric] - a[metric]);
-  const maxV = Math.max(...sorted.map(t => t[metric]), .01);
-  const decided = m.me[2] - m.me[0] < 1 && m.opp_q[2] - m.opp_q[0] < 1;
-  const wlabel = m.win >= .995 ? "≈100%" : m.win <= .005 ? "≈0%" : pct(m.win);
-
-  $("#app").innerHTML = `
-  <section class="panel hero">
-    <div class="top"><h2 class="name num" style="text-transform:none">${esc(me.name)}</h2>
-      <div class="muted">Record ${esc(me.record)} · standing ${me.standing} of ${D.teams.length} · ${D.cutoff.seed}-team playoff cutoff is ${esc(D.cutoff.team)} (${esc(D.cutoff.record)}) · roster score ${me.roster}</div></div>
-    <div class="stats">
-      <div class="stat"><div class="v">${pct(me.playoffs)}</div><div class="l">Make playoffs</div></div>
-      <div class="stat"><div class="v">${pct(me.bye)}</div><div class="l">First-round bye</div></div>
-      <div class="stat"><div class="v">${pct(me.final)}</div><div class="l">Title game</div></div>
-      <div class="stat key"><div class="v">${pct(me.title, 1)}</div><div class="l">Win the league</div></div>
-    </div>
-  </section>
-
-  <div class="grid2">
-    <section class="panel">
-      <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h2>League odds</h2>
-        <div class="seg" id="metrics" role="group" aria-label="Odds metric">${METRICS.map(([k, l]) => `<button data-m="${k}" aria-pressed="${k === metric}">${l}</button>`).join("")}</div>
-      </div>
-      <ul class="bars">${sorted.map(t => `<li class="bar ${t.me ? "me" : ""}" title="${esc(t.name)}: playoffs ${pct(t.playoffs)}, bye ${pct(t.bye)}, title game ${pct(t.final)}, title ${pct(t.title, 1)}">
-        <span class="nm">${esc(t.name)}</span><span class="track"><span class="fill" style="display:block;width:${t[metric] / maxV * 100}%"></span></span><span class="pv">${pct(t[metric], metric === "title" ? 1 : 0)}</span></li>`).join("")}</ul>
-    </section>
-
-    <section class="panel">
-      <h2>This week</h2>
-      <div class="muted small">vs ${esc(m.opp)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:8px 0">
-        <div><div class="live">${m.live_me.toFixed(1)}</div><div class="muted small">you, live</div></div>
-        <div><div class="live" style="color:var(--muted)">${m.live_opp.toFixed(1)}</div><div class="muted small">${esc(m.opp)}, live</div></div>
-      </div>
-      ${decided ? `<div class="small muted">Nobody left to play in your lineup, so this matchup is settled.</div>` : `<div class="small muted">Projected final, low–median–high</div>
-      ${rng(m.me, 0, "me")}<div class="small">You ${wk(m.me)} · median ${m.me[1].toFixed(0)}</div>
-      ${rng(m.opp_q, 0, "")}<div class="small">Opponent ${wk(m.opp_q)} · median ${m.opp_q[1].toFixed(0)}</div>`}
-      <div style="margin-top:12px"><span class="num" style="font-size:34px">${wlabel}</span> <span class="muted">${decided ? (m.win > .5 ? "won" : "lost") : "win chance"}${m.espn_win != null ? ` · ESPN shows ${pct(m.espn_win)}` : ""}</span></div>
-      <div class="small muted" style="margin-top:6px">Still to play: ${m.pending.length ? esc(m.pending.join(", ")) : "nobody in your lineup"}</div>
-    </section>
-  </div>
-
-  <section class="panel">
-    <h2>Power rankings</h2>
-    <div class="tbl"><table>
-      <tr><th>#</th><th>Team</th><th>Record</th><th class="r">Exp. wins</th><th>Roster strength</th><th>Read</th></tr>
-      ${[...D.teams].sort((a, b) => a.power_rank - b.power_rank).map(t => `<tr class="${t.me ? "me" : ""}"><td class="num">${t.power_rank}</td><td>${esc(t.name)}</td><td class="num">${esc(t.record)}</td>
-        <td class="r">${t.xwins.toFixed(1)}</td><td><span class="mini"><i style="width:${t.roster}%"></i></span><span class="num">${t.roster.toFixed(0)}</span></td>
-        <td>${t.tag ? `<span class="pill ${t.tag.startsWith("LEGIT") ? "good" : "crit"}">${t.tag === "LEGIT CONTENDER" ? "Real contender" : "Record outruns roster"}</span> ` : ""}${t.luck !== "as expected" ? `<span class="pill plain">${t.luck === "LUCKY" ? "Lucky" : "Unlucky"}</span>` : ""}</td></tr>`).join("")}
-    </table></div>
-    <div class="small muted" style="margin-top:8px">Roster strength is 0–100 against this league's other rosters (50 is average). Expected wins counts how many teams you outscored each week.</div>
-  </section>
-
-  <div class="grid2">
-    <section class="panel">
-      <h2>Where my team is thin</h2>
-      <div class="tbl"><table>
-        <tr><th>Slot</th><th class="r">Pts/g</th><th class="r">Rank</th><th>Need</th><th class="r">To top quarter</th></tr>
-        ${D.needs.map(n => `<tr><td>${esc(n.slot)}</td><td class="r">${n.mine}</td><td class="r">${n.rank}</td><td><span class="pill ${tier(n.tier)}">${esc(n.tier.replace(" opportunity", "").replace(" need", ""))}</span></td><td class="r">${n.gain_to_top_quartile > 0 ? "+" + n.gain_to_top_quartile : "–"}</td></tr>`).join("")}
-      </table></div>
-    </section>
-    <section class="panel">
-      <h2>Waivers &amp; risers</h2>
-      <ul class="plain">${D.waivers.slice(0, 3).map(w => `<li><b>Add ${esc(w.add)}</b><br><span class="muted small">drop ${esc(w.drop)} · title odds ${(w.d_title * 100 >= 0 ? "+" : "") + (w.d_title * 100).toFixed(2)} pts · playoffs ${(w.d_playoffs * 100 >= 0 ? "+" : "") + (w.d_playoffs * 100).toFixed(1)} pts</span></li>`).join("")}</ul>
-      <h3 style="margin:14px 0 6px">Growing roles on waivers</h3>
-      <ul class="plain">${D.breakouts.slice(0, 3).map(b => `<li>${esc(b.name)} <span class="muted small">${esc(b.pos)}, ${esc(b.team)} · snaps ${(b.snap_season * 100).toFixed(0)}% → ${(b.snap_recent * 100).toFixed(0)}% · target share ${(b.target_share * 100).toFixed(0)}%</span></li>`).join("")}</ul>
-    </section>
-  </div>
-
-  <section class="panel">
-    <h2>Trade targets</h2>
-    <div class="small muted" style="margin-bottom:6px">Ranked by chance the deal lands times the title odds it adds. Acceptance chances are my own estimate, not measured. Open one for the full ladder of offers.</div>
-    ${D.trades.slice(0, 6).map((t, i) => { const f = t.offers.fair; return `<details ${i === 0 ? "open" : ""}>
-      <summary><span class="t">${esc(t.target)} <span class="muted small" style="font-family:var(--f-body)">${esc(t.pos)}, ${esc(t.nfl)} · ${esc(t.owner)}</span></span>
-        <span class="delta">${f.d_title >= 0 ? "+" : ""}${(f.d_title * 100).toFixed(1)} pts</span>
-        <span><span class="pill ${klass(t.klass)}">${esc(t.klass.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()))}</span> <span class="muted small">projects ${t.ppg} pts/g (${t.floor}–${t.ceil})</span></span>
-        <span class="muted small" style="text-align:right">title ${pct(me.title, 1)} → ${pct(f.title_after, 1)}</span></summary>
-      <div class="why">Lifts your lineup ${f.gain_me >= 0 ? "+" : ""}${f.gain_me.toFixed(1)} pts a week for the rest of the season. Their lineup changes ${f.gain_them >= 0 ? "+" : ""}${f.gain_them.toFixed(1)}. ${t.gap > 0.5 ? "Managers price him below what he should score." : t.gap < -0.5 ? "Managers price him above what he should score." : "Priced about right."}</div>
-      <div class="tbl"><table class="offers"><tr><th>Offer</th><th>You give</th><th class="r">They accept</th><th class="r">Your title odds</th></tr>
-      ${["opening", "fair", "aggressive", "maximum"].map(k => { const o = t.offers[k]; return o ? `<tr><td>${k}</td><td>${esc(o.give)}</td><td class="r">${pct(o.accept)}</td><td class="r ${o.d_title > 0 ? "" : "bad"}">${pct(o.title_after, 1)} (${(o.d_title * 100 >= 0 ? "+" : "") + (o.d_title * 100).toFixed(1)})${o.d_title > 0 ? "" : " ✕"}</td></tr>` : `<tr><td>${k}</td><td class="muted" colspan="3">no worthwhile offer at this level</td></tr>`; }).join("")}
-      </table></div></details>`; }).join("")}
-  </section>
-
-  <section class="panel foot">
-    <h2 style="color:var(--ink)">How far to trust this</h2>
-    <p>Projections blend ESPN's preseason number, this season so far, and last year. On the held-out 2025 season that beat plain season averages by about 2% per week and 5% against the next four weeks. Weekly fantasy scoring is mostly luck, so expect wide ranges.</p>
-    <p>Odds come from simulating the rest of the season ${D.sims.toLocaleString()} times with real byes, injury return rates and the league's own seeding rule. They ignore future trades and waiver moves by other managers, so they run a bit confident.</p>
-    <p>Trade acceptance chances are a rule of thumb about perceived value and roster need. Gains from several trades do not add up.</p>
-  </section>`;
-
-  $("#metrics").onclick = e => { const b = e.target.closest("button"); if (b) { metric = b.dataset.m; render(); } };
+  const D = DATA[S.league], me = D.teams.find(t => t.me);
+  $("#fresh").textContent = `Week ${D.week} · ESPN data ${D.espn_refreshed.replace("T", " ").slice(0, 16)} UTC · a snapshot, not a live feed`;
+  $("#leagues").innerHTML = leagues.map(l => `<button aria-pressed="${l === S.league}" data-l="${l}">${esc(DATA[l].league)}</button>`).join("");
+  $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" id="tab-${k}" data-t="${k}" aria-selected="${k === S.tab}" tabindex="${k === S.tab ? 0 : -1}" aria-controls="view">${l}</button>`).join("");
+  $("#view").setAttribute("aria-labelledby", "tab-" + S.tab);
+  $("#view").innerHTML = V[S.tab](D, me);
+  try { history.replaceState(null, "", "#" + S.league + "-" + S.tab); } catch (e) {}
+  const on = $("#tabs [aria-selected=true]");
+  if (on && on.scrollIntoView) on.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
+
+document.addEventListener("click", e => {
+  const l = e.target.closest("[data-l]"), t = e.target.closest("[data-t]"), m = e.target.closest("[data-m]"), i = e.target.closest("[data-i]");
+  if (l) { S.league = l.dataset.l; S.sel = 0; }
+  else if (t) S.tab = t.dataset.t;
+  else if (m) S.metric = m.dataset.m;
+  else if (i) S.sel = +i.dataset.i;
+  else return;
+  render();
+  if (t) $("#tab-" + S.tab).focus();
+});
+$("#tabs").addEventListener("keydown", e => {
+  const ks = TABS.map(x => x[0]), at = ks.indexOf(S.tab);
+  const to = e.key === "ArrowRight" ? ks[(at + 1) % ks.length] : e.key === "ArrowLeft" ? ks[(at + ks.length - 1) % ks.length] : e.key === "Home" ? ks[0] : e.key === "End" ? ks[ks.length - 1] : null;
+  if (to) { e.preventDefault(); S.tab = to; render(); $("#tab-" + to).focus(); }
+});
 render();
 </script>
